@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>{% block title %}电力刷题系统{% endblock %}</title>
+
+  <!-- ✅ PWA 必要标签 -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="最后一舞">
+
+  <!-- ✅ iOS 图标（苹果不读manifest，需单独声明） -->
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -28,5 +39,17 @@
   <script src="{{ url_for('static', filename='js/local_storage.js') }}"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   {% block extra_js %}{% endblock %}
+
+  <!-- ✅ 注册 Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker
+          .register('/sw.js')
+          .then(() => console.log('✅ SW注册成功'))
+          .catch(err => console.log('❌ SW注册失败', err));
+      });
+    }
+  </script>
 </body>
 </html>

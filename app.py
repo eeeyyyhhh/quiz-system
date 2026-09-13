@@ -5,7 +5,7 @@ import random
 import time
 from datetime import date, timedelta, datetime
 
-from flask import Flask, render_template, request, jsonify, session, redirect
+from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory
 
 from config import SUBJECTS, MASTERED_CORRECT_STREAK
 from modules.loader import load_all_questions, get_question_id
@@ -324,13 +324,8 @@ def exam_page():
 
 @app.route('/api/exam/start', methods=['POST'])
 def exam_start():
-    """
-    从全库按题型抽题：
-      ratio = {'单选题': 40, '多选题': 40, '判断题': 40}
-    前端固定传这个 ratio，duration=60
-    """
     data     = request.json
-    subject  = data.get('subject') or None      # 保留，默认 None 即全库
+    subject  = data.get('subject') or None
     duration = int(data.get('duration', 60))
     ratio    = data.get('ratio', {
         '单选题': 40,
@@ -338,7 +333,6 @@ def exam_start():
         '判断题': 40,
     })
 
-    # 按题型分池
     all_qs   = _build_question_list(subject=subject, mode='random')
     if not all_qs:
         return jsonify({'error': '题库为空'}), 400
@@ -348,7 +342,7 @@ def exam_start():
         type_map.setdefault(q['type'], []).append(q)
 
     selected = []
-    shortage = []   # 记录不足的题型
+    shortage = []
 
     for q_type, count in ratio.items():
         pool = type_map.get(q_type, [])
@@ -361,7 +355,6 @@ def exam_start():
     if not selected:
         return jsonify({'error': '题库中无可用题目'}), 400
 
-    # 按题型排序：单选 → 多选 → 判断（便于前端分组展示）
     type_order = {'单选题': 0, '多选题': 1, '判断题': 2}
     selected.sort(key=lambda q: type_order.get(q['type'], 9))
 
@@ -376,7 +369,6 @@ def exam_start():
 
     formatted = [_format_question(q, i, total_count)
                  for i, q in enumerate(selected)]
-    # 不把答案发到前端
     for q in formatted:
         q.pop('answer', None)
 
@@ -393,7 +385,6 @@ def exam_start():
 
 @app.route('/api/exam/submit', methods=['POST'])
 def exam_submit():
-    """批卷：对比答案，保存考试记录，返回详情"""
     data     = request.json
     answers  = data.get('answers', {})
     duration = int(data.get('duration', 0))
@@ -423,14 +414,12 @@ def exam_submit():
         if is_correct:
             correct += 1
 
-        # 构建选项
         options = []
         for key in ['A', 'B', 'C', 'D', 'E', 'F']:
             val = q.get(f'option_{key.lower()}', '')
             if val:
                 options.append({'key': key, 'text': val})
 
-        # 判断题显示转换
         display_correct = correct_answer
         display_user    = user_answer
         if q['type'] == '判断题':
@@ -440,7 +429,6 @@ def exam_submit():
                 '错误'  if user_answer == 'B' else
                 '未作答'
             )
-            # 判断题选项也统一
             options = [
                 {'key': 'A', 'text': '正确'},
                 {'key': 'B', 'text': '错误'},
@@ -449,7 +437,7 @@ def exam_submit():
         exp = db.get_explanation(q_id)
         details.append({
             'q_id':           q_id,
-            'subject':        q['subject'],   # 前端本地存储按科目统计用
+            'subject':        q['subject'],
             'stem':           q['stem'],
             'type':           q['type'],
             'options':        options,
@@ -462,7 +450,6 @@ def exam_submit():
     score         = round(correct / total * 100, 1) if total else 0
     subject_label = session.get('exam_subject', '综合')
 
-    # 保存到数据库（考试记录供统计页展示）
     db.save_exam_record(
         subject_label, total, correct, score, duration,
         json.dumps(details, ensure_ascii=False)
@@ -580,6 +567,14 @@ def review_page():
 @app.route('/api/today_review')
 def api_today_review():
     return jsonify({'total': 0, 'questions': []})
+
+# ============================================================
+# ✅ PWA - Service Worker 必须从根路径提供
+# ============================================================
+@app.route('/sw.js')
+def service_worker():
+    return send_from_directory('static/js', 'sw.js',
+                               mimetype='application/javascript')
 
 # ============================================================
 # 启动
