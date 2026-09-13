@@ -24,6 +24,8 @@
     {% block content %}{% endblock %}
   </main>
 
+  <!-- local_storage.js 必须在 main.js 之前 -->
+  <script src="{{ url_for('static', filename='js/local_storage.js') }}"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   {% block extra_js %}{% endblock %}
 </body>

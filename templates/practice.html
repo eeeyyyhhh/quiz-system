@@ -56,7 +56,7 @@
   <button class="btn-primary btn-full" onclick="startPractice()">开始练习</button>
 </div>
 
-<!-- 练习区域（做题时显示） -->
+<!-- 练习区域 -->
 <div id="practice-area" class="practice-area hidden">
   <!-- 进度条 -->
   <div class="progress-bar-wrap">
@@ -76,21 +76,18 @@
     </div>
 
     <div class="question-stem" id="question-stem"></div>
-
     <div class="options-list" id="options-list"></div>
 
-    <!-- 多选题提交按钮 -->
     <button class="btn-submit-multi hidden" id="submit-multi-btn" onclick="submitMultiAnswer()">
       ✓ 提交答案
     </button>
   </div>
 
-  <!-- 答题结果（答完后显示） -->
+  <!-- 答题结果 -->
   <div class="result-card hidden" id="result-card">
     <div class="result-header" id="result-header"></div>
     <div class="result-answer" id="result-answer"></div>
 
-    <!-- 解析区域 -->
     <div class="explanation-box" id="explanation-box">
       <div class="exp-title">📖 解析</div>
       <div class="exp-content" id="exp-content">暂无解析</div>
@@ -105,7 +102,6 @@
       </div>
     </div>
 
-    <!-- 笔记区域 -->
     <div class="note-box">
       <div class="note-title">📝 我的笔记</div>
       <textarea class="note-textarea" id="note-textarea"
@@ -114,7 +110,7 @@
     </div>
   </div>
 
-  <!-- 底部导航按钮 -->
+  <!-- 底部导航 -->
   <div class="bottom-nav">
     <button class="btn-nav" id="prev-btn" onclick="prevQuestion()">‹ 上一题</button>
     <button class="btn-nav btn-nav-mid" onclick="goToIndex()">跳转</button>
@@ -123,11 +119,11 @@
 </div>
 
 <script>
-let currentQ = null;
+let currentQ      = null;
 let selectedOptions = [];
-let answered = false;
+let answered      = false;
 
-// ====== 选项组单选逻辑 ======
+// 选项组单选逻辑
 document.querySelectorAll('.btn-group').forEach(group => {
   group.addEventListener('click', e => {
     if (!e.target.classList.contains('opt-btn')) return;
@@ -142,22 +138,61 @@ function getGroupVal(id) {
 }
 
 async function startPractice() {
-  const payload = {
-    subject:      getGroupVal('subject-group'),
-    q_type:       getGroupVal('type-group'),
-    mode:         getGroupVal('mode-group'),
-    filter_mode:  getGroupVal('filter-group'),
-    range_start:  document.getElementById('range-start').value || 1,
-    range_end:    document.getElementById('range-end').value || null,
-  };
+  const filterMode = getGroupVal('filter-group');
+  const subject    = getGroupVal('subject-group');
+  const q_type     = getGroupVal('type-group');
+  const mode       = getGroupVal('mode-group');
 
-  const res = await fetch('/api/practice/start', {
+  // 从服务器获取题目ID列表
+  const params = new URLSearchParams();
+  if (subject) params.append('subject', subject);
+  if (q_type)  params.append('q_type', q_type);
+
+  const res    = await fetch('/api/local/question_ids?' + params.toString());
+  let allIds   = await res.json();
+
+  // 题号范围过滤
+  const rangeStart = parseInt(document.getElementById('range-start').value) || 1;
+  const rangeEnd   = parseInt(document.getElementById('range-end').value) || null;
+  if (rangeEnd) {
+    allIds = allIds.filter(q => {
+      const seq = parseInt(q.seq);
+      return seq >= rangeStart && seq <= rangeEnd;
+    });
+  }
+
+  // ✅ 根据本地记录过滤
+  const answeredIds = LocalDB.getAnsweredIds(subject);
+  const wrongIds    = LocalDB.getWrongIds(subject);
+  const favIds      = LocalDB.getFavoriteIds(subject);
+
+  if (filterMode === 'undone') {
+    allIds = allIds.filter(q => !answeredIds.has(q.q_id));
+  } else if (filterMode === 'done') {
+    allIds = allIds.filter(q => answeredIds.has(q.q_id));
+  } else if (filterMode === 'wrong') {
+    allIds = allIds.filter(q => wrongIds.has(q.q_id));
+  } else if (filterMode === 'favorite') {
+    allIds = allIds.filter(q => favIds.has(q.q_id));
+  }
+
+  if (allIds.length === 0) {
+    alert('没有符合条件的题目');
+    return;
+  }
+
+  // 随机模式
+  if (mode === 'random') {
+    allIds = allIds.sort(() => Math.random() - 0.5);
+  }
+
+  // 发给服务器开始练习
+  const startRes = await fetch('/api/practice/start_by_ids', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ q_ids: allIds.map(q => q.q_id) }),
   });
-  const data = await res.json();
-
+  const data = await startRes.json();
   if (data.error) { alert(data.error); return; }
 
   document.getElementById('setup-panel').classList.add('hidden');
@@ -166,76 +201,60 @@ async function startPractice() {
 }
 
 function renderQuestion(q) {
-  currentQ = q;
-  answered = false;
+  currentQ        = q;
+  answered        = false;
   selectedOptions = [];
 
-  // 进度
+  // ✅ 收藏状态从本地读
+  q.is_favorite = LocalDB.isFavorite(q.q_id);
+
   const pct = Math.round((q.index + 1) / q.total * 100);
-  document.getElementById('progress-bar').style.width = pct + '%';
-  document.getElementById('progress-label').textContent = `${q.index + 1} / ${q.total}`;
+  document.getElementById('progress-bar').style.width      = pct + '%';
+  document.getElementById('progress-label').textContent    = `${q.index + 1} / ${q.total}`;
   document.getElementById('subject-type-label').textContent = `${q.subject} · ${q.type}`;
+  document.getElementById('q-type-badge').textContent      = q.type;
+  document.getElementById('q-subject-badge').textContent   = q.subject;
 
-  // 题型/专业标签
-  document.getElementById('q-type-badge').textContent = q.type;
-  document.getElementById('q-subject-badge').textContent = q.subject;
+  const favBtn = document.getElementById('fav-btn');
+  favBtn.textContent = q.is_favorite ? '★' : '☆';
+  favBtn.classList.toggle('favorited', q.is_favorite);
 
-  // 收藏按钮
-  document.getElementById('fav-btn').textContent = q.is_favorite ? '★' : '☆';
-  document.getElementById('fav-btn').classList.toggle('favorited', q.is_favorite);
-
-  // 题干
   document.getElementById('question-stem').textContent = q.stem;
 
-  // 选项
   const optList = document.getElementById('options-list');
   optList.innerHTML = '';
   q.options.forEach(opt => {
     const btn = document.createElement('button');
-    btn.className = 'option-btn';
+    btn.className   = 'option-btn';
     btn.dataset.key = opt.key;
-    btn.innerHTML = `<span class="opt-key">${opt.key}</span><span class="opt-text">${opt.text}</span>`;
+    btn.innerHTML   = `<span class="opt-key">${opt.key}</span>
+                       <span class="opt-text">${opt.text}</span>`;
     btn.onclick = () => selectOption(opt.key, q.type);
     optList.appendChild(btn);
   });
 
-  // 多选题显示提交按钮
-  const multiBtn = document.getElementById('submit-multi-btn');
-  if (q.type === '多选题') {
-    multiBtn.classList.remove('hidden');
-  } else {
-    multiBtn.classList.add('hidden');
-  }
-
-  // 隐藏结果
+  document.getElementById('submit-multi-btn')
+    .classList.toggle('hidden', q.type !== '多选题');
   document.getElementById('result-card').classList.add('hidden');
-
-  // 笔记
   document.getElementById('note-textarea').value = q.note || '';
-
-  // 上一题按钮
-  document.getElementById('prev-btn').disabled = q.index === 0;
-  document.getElementById('next-btn').textContent = q.index === q.total - 1 ? '完成 ✓' : '下一题 ›';
+  document.getElementById('prev-btn').disabled =
+    q.index === 0;
+  document.getElementById('next-btn').textContent =
+    q.index === q.total - 1 ? '完成 ✓' : '下一题 ›';
 
   window.scrollTo(0, 0);
 }
 
 function selectOption(key, qType) {
   if (answered) return;
-
   if (qType === '多选题') {
-    // 多选：toggle
     const idx = selectedOptions.indexOf(key);
-    if (idx >= 0) {
-      selectedOptions.splice(idx, 1);
-    } else {
-      selectedOptions.push(key);
-    }
+    if (idx >= 0) selectedOptions.splice(idx, 1);
+    else selectedOptions.push(key);
     document.querySelectorAll('.option-btn').forEach(btn => {
       btn.classList.toggle('selected', selectedOptions.includes(btn.dataset.key));
     });
   } else {
-    // 单选/判断：直接提交
     selectedOptions = [key];
     submitAnswer(key);
   }
@@ -249,43 +268,51 @@ async function submitMultiAnswer() {
 async function submitAnswer(userAnswer) {
   answered = true;
 
-  const res = await fetch('/api/practice/answer', {
+  const res  = await fetch('/api/practice/answer', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ q_id: currentQ.q_id, answer: userAnswer }),
   });
   const data = await res.json();
 
+  // ✅ 存到本地
+  LocalDB.recordAnswer(
+    currentQ.q_id, currentQ.subject, currentQ.type,
+    userAnswer, data.correct
+  );
+  LocalDB.updateWrongBook(
+    currentQ.q_id, currentQ.subject,
+    userAnswer, data.correct
+  );
+
   // 标记选项颜色
   document.querySelectorAll('.option-btn').forEach(btn => {
     const key = btn.dataset.key;
-    const isCorrectKey = data.correct_answer.includes(key);
-    const isSelectedKey = userAnswer.includes(key);
-
-    if (isCorrectKey) {
-      btn.classList.add('correct');
-    } else if (isSelectedKey && !isCorrectKey) {
-      btn.classList.add('wrong');
-    }
+    if (data.correct_answer.includes(key)) btn.classList.add('correct');
+    else if (userAnswer.includes(key))     btn.classList.add('wrong');
     btn.disabled = true;
   });
 
-  // 显示结果
   const resultCard = document.getElementById('result-card');
   resultCard.classList.remove('hidden');
 
   const header = document.getElementById('result-header');
   header.textContent = data.correct ? '✅ 回答正确！' : '❌ 回答错误';
-  header.className = 'result-header ' + (data.correct ? 'correct' : 'wrong');
+  header.className   = 'result-header ' + (data.correct ? 'correct' : 'wrong');
+
+  // ✅ 错题次数从本地读
+  const wrongEntry = (LocalDB._get('wrong_book') || {})[currentQ.q_id];
+  const wrongCount = wrongEntry ? wrongEntry.wrong_count : 0;
 
   document.getElementById('result-answer').innerHTML =
     `正确答案：<strong>${data.correct_answer}</strong>` +
-    (!data.correct ? `　你的答案：<span class="wrong-text">${userAnswer}</span>` : '') +
-    (data.wrong_count > 0 ? `　<span class="wrong-count">已错 ${data.wrong_count} 次</span>` : '');
+    (!data.correct
+      ? `　你的答案：<span class="wrong-text">${userAnswer}</span>` : '') +
+    (wrongCount > 0
+      ? `　<span class="wrong-count">已错 ${wrongCount} 次</span>` : '');
 
-  // 解析
-  const expContent = document.getElementById('exp-content');
-  expContent.textContent = data.explanation || '暂无解析，可点击下方按钮生成';
+  document.getElementById('exp-content').textContent =
+    data.explanation || '暂无解析，可点击下方按钮生成';
 
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -293,21 +320,17 @@ async function submitAnswer(userAnswer) {
 async function nextQuestion() {
   if (!currentQ) return;
   if (currentQ.index === currentQ.total - 1) {
-    if (confirm('已完成所有题目！返回练习设置？')) {
-      location.reload();
-    }
+    if (confirm('已完成所有题目！返回练习设置？')) location.reload();
     return;
   }
   const res = await fetch(`/api/practice/question/${currentQ.index + 1}`);
-  const q   = await res.json();
-  renderQuestion(q);
+  renderQuestion(await res.json());
 }
 
 async function prevQuestion() {
   if (!currentQ || currentQ.index === 0) return;
   const res = await fetch(`/api/practice/question/${currentQ.index - 1}`);
-  const q   = await res.json();
-  renderQuestion(q);
+  renderQuestion(await res.json());
 }
 
 function goToIndex() {
@@ -317,17 +340,13 @@ function goToIndex() {
     .then(r => r.json()).then(renderQuestion);
 }
 
-async function toggleFavorite() {
-  const res = await fetch('/api/favorite', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ q_id: currentQ.q_id, subject: currentQ.subject }),
-  });
-  const data = await res.json();
-  const btn = document.getElementById('fav-btn');
-  btn.textContent = data.favorited ? '★' : '☆';
-  btn.classList.toggle('favorited', data.favorited);
-  currentQ.is_favorite = data.favorited;
+// ✅ 收藏改用本地存储
+function toggleFavorite() {
+  const status = LocalDB.toggleFavorite(currentQ.q_id, currentQ.subject);
+  const btn    = document.getElementById('fav-btn');
+  btn.textContent = status ? '★' : '☆';
+  btn.classList.toggle('favorited', status);
+  currentQ.is_favorite = status;
 }
 
 async function saveNote() {
@@ -341,9 +360,9 @@ async function saveNote() {
 
 function showEditExplanation() {
   document.getElementById('exp-edit').classList.remove('hidden');
+  const cur = document.getElementById('exp-content').textContent;
   document.getElementById('exp-textarea').value =
-    document.getElementById('exp-content').textContent === '暂无解析，可点击下方按钮生成'
-      ? '' : document.getElementById('exp-content').textContent;
+    cur === '暂无解析，可点击下方按钮生成' ? '' : cur;
 }
 function hideEditExplanation() {
   document.getElementById('exp-edit').classList.add('hidden');
@@ -361,8 +380,8 @@ async function saveExplanation() {
 async function showAiExplanation() {
   const btn = event.target;
   btn.textContent = '🤖 生成中...';
-  btn.disabled = true;
-  const res = await fetch('/api/explanation/ai', {
+  btn.disabled    = true;
+  const res  = await fetch('/api/explanation/ai', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ q_id: currentQ.q_id }),
@@ -370,7 +389,7 @@ async function showAiExplanation() {
   const data = await res.json();
   document.getElementById('exp-content').textContent = data.content || '生成失败';
   btn.textContent = '🤖 AI生成解析';
-  btn.disabled = false;
+  btn.disabled    = false;
 }
 </script>
 {% endblock %}

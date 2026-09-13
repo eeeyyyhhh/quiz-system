@@ -3,34 +3,28 @@
 {% block content %}
 <div class="page-home">
 
-  <!-- 学习计划Banner -->
-  {% if plan_info %}
-  <div class="plan-banner">
+  <!-- 学习计划Banner（由JS动态填充） -->
+  <div class="plan-banner hidden" id="plan-banner">
     <div class="plan-item">
-      <span class="plan-num">{{ plan_info.days_left }}</span>
+      <span class="plan-num" id="plan-days-left">0</span>
       <span class="plan-label">距考试天数</span>
     </div>
     <div class="plan-divider"></div>
     <div class="plan-item">
-      <span class="plan-num {{ 'green' if plan_info.today_done >= plan_info.daily_target else 'orange' }}">
-        {{ plan_info.today_done }}/{{ plan_info.daily_target }}
-      </span>
+      <span class="plan-num" id="plan-today-done">0/0</span>
       <span class="plan-label">今日完成/目标</span>
     </div>
     <div class="plan-divider"></div>
     <div class="plan-item">
-      <span class="plan-num">{{ plan_info.total_remain }}</span>
+      <span class="plan-num" id="plan-total-remain">0</span>
       <span class="plan-label">剩余题量</span>
     </div>
   </div>
-  {% endif %}
 
-  <!-- 今日复习提示 -->
-  {% if today_review > 0 %}
-  <div class="review-alert" onclick="startTodayReview()">
-    🔔 今日有 <strong>{{ today_review }}</strong> 道错题需要复习，点击开始 →
+  <!-- 今日复习提示（由JS动态填充） -->
+  <div class="review-alert hidden" id="review-alert" onclick="startTodayReview()">
+    🔔 今日有 <strong id="review-count">0</strong> 道错题需要复习，点击开始 →
   </div>
-  {% endif %}
 
   <!-- 总览统计 -->
   <div class="stats-overview">
@@ -39,15 +33,15 @@
       <div class="stat-label">题库总题数</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num blue">{{ stats.answered }}</div>
+      <div class="stat-num blue" id="stat-answered">0</div>
       <div class="stat-label">已做题数</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num red">{{ stats.wrong }}</div>
+      <div class="stat-num red" id="stat-wrong">0</div>
       <div class="stat-label">错题数</div>
     </div>
     <div class="stat-card">
-      <div class="stat-num yellow">{{ stats.favorites }}</div>
+      <div class="stat-num yellow" id="stat-favorites">0</div>
       <div class="stat-label">收藏数</div>
     </div>
   </div>
@@ -97,36 +91,61 @@
 </div>
 
 <script>
-// 加载各专业进度
 document.addEventListener('DOMContentLoaded', async () => {
+  // ✅ 从本地读取统计数据
+  const totalStats = LocalDB.getStats();
+  document.getElementById('stat-answered').textContent  = totalStats.answered;
+  document.getElementById('stat-wrong').textContent     = totalStats.wrong;
+  document.getElementById('stat-favorites').textContent = totalStats.favorites;
+
+  // ✅ 今日复习提示
+  const reviewIds = LocalDB.getTodayReviewIds();
+  if (reviewIds.length > 0) {
+    document.getElementById('review-count').textContent = reviewIds.length;
+    document.getElementById('review-alert').classList.remove('hidden');
+  }
+
+  // ✅ 各科目进度（题目总数从服务器取，已答数从本地取）
   const subjects = {{ subjects | tojson }};
   for (const sub of subjects) {
     try {
-      const res = await fetch(`/api/stats/${encodeURIComponent(sub)}`);
-      const data = await res.json();
-      const pct = data.total ? Math.round(data.answered / data.total * 100) : 0;
+      const res   = await fetch(`/api/stats/${encodeURIComponent(sub)}`);
+      const data  = await res.json();
+      const total = data.total;
+
+      const localStats = LocalDB.getStats(sub);
+      const answered   = localStats.answered;
+      const pct = total ? Math.round(answered / total * 100) : 0;
+
       const bar = document.querySelector(`.subject-bar[data-subject="${sub}"]`);
       if (bar) {
         bar.style.width = pct + '%';
-        bar.style.background = pct >= 80 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#3b82f6';
+        bar.style.background =
+          pct >= 80 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#3b82f6';
       }
       const info = document.getElementById(`info-${sub}`);
       if (info) {
-        info.textContent = `${data.answered}/${data.total} · 正确率${data.correct_rate}%`;
+        info.textContent =
+          `${answered}/${total} · 正确率${localStats.correct_rate}%`;
       }
     } catch(e) {}
   }
 });
 
 async function startTodayReview() {
-  const res = await fetch('/api/today_review');
-  const data = await res.json();
-  if (data.total === 0) {
+  const reviewIds = LocalDB.getTodayReviewIds();
+  if (reviewIds.length === 0) {
     alert('今日没有需要复习的题目 🎉');
     return;
   }
-  sessionStorage.setItem('practice_mode', 'review');
-  window.location.href = '/practice/doing';
+  const res = await fetch('/api/practice/start_by_ids', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_ids: reviewIds }),
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  window.location.href = '/practice';
 }
 </script>
 {% endblock %}

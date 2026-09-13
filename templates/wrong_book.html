@@ -4,121 +4,227 @@
 
 <div class="page-header">
   <h2>📕 错题本</h2>
-  <p>共有 <strong>{{ total }}</strong> 道错题</p>
+  <p>共有 <strong id="wrong-total">0</strong> 道错题</p>
 </div>
 
 <!-- 筛选栏 -->
 <div class="card" style="margin-bottom:20px;">
-  <form method="GET" action="/wrong_book" style="display:flex;gap:15px;flex-wrap:wrap;align-items:center;">
-    <select name="subject" class="form-control" style="width:150px;">
+  <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:center;">
+    <select id="filter-subject" class="form-control" style="width:150px;"
+            onchange="loadWrongBook()">
       <option value="">全部科目</option>
       {% for s in subjects %}
-      <option value="{{ s }}" {% if current_subject == s %}selected{% endif %}>{{ s }}</option>
+      <option value="{{ s }}">{{ s }}</option>
       {% endfor %}
     </select>
-    <select name="sort" class="form-control" style="width:150px;">
-      <option value="recent" {% if sort=='recent' %}selected{% endif %}>最近错误</option>
-      <option value="most" {% if sort=='most' %}selected{% endif %}>错误次数最多</option>
+    <select id="filter-sort" class="form-control" style="width:150px;"
+            onchange="loadWrongBook()">
+      <option value="recent">最近错误</option>
+      <option value="most">错误次数最多</option>
     </select>
-    <button type="submit" class="btn btn-primary">筛选</button>
-    {% if total > 0 %}
-    <a href="/wrong_book/practice" class="btn btn-success" style="margin-left:auto;">
+    <button id="practice-wrong-btn" class="btn btn-success"
+            style="margin-left:auto;display:none;"
+            onclick="practiceWrongQuestions()">
       🔄 开始错题练习
-    </a>
-    {% endif %}
-  </form>
+    </button>
+  </div>
 </div>
 
-{% if wrong_questions %}
-  {% for q in wrong_questions %}
-  <div class="card" style="margin-bottom:15px;border-left:4px solid #e74c3c;">
-    <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
-      <div>
-        <span style="background:#ffeaea;color:#e74c3c;padding:2px 8px;border-radius:10px;font-size:12px;">{{ q.subject }}</span>
-        <span style="background:#f0f0f0;color:#666;padding:2px 8px;border-radius:10px;font-size:12px;margin-left:5px;">{{ q.type }}</span>
-      </div>
-      <div style="color:#e74c3c;font-size:13px;">
-        错了 <strong>{{ q.wrong_count }}</strong> 次
-      </div>
-    </div>
+<!-- 错题列表 -->
+<div id="wrong-list"></div>
 
-    <p style="font-size:15px;color:#333;margin-bottom:12px;">{{ q.question }}</p>
-
-    <!-- 选项 -->
-    {% if q.options %}
-    <div style="margin-bottom:10px;">
-      {% for opt in q.options %}
-      <div style="padding:6px 10px;margin:4px 0;border-radius:5px;font-size:14px;
-        {% if opt == q.correct_answer %}background:#e8f8e8;border:1px solid #27ae60;color:#27ae60;
-        {% elif opt == q.user_answer %}background:#ffeaea;border:1px solid #e74c3c;color:#e74c3c;
-        {% else %}background:#f9f9f9;border:1px solid #eee;color:#666;{% endif %}">
-        {{ opt }}
-        {% if opt == q.correct_answer %} ✅{% endif %}
-        {% if opt == q.user_answer and opt != q.correct_answer %} ❌{% endif %}
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- 正确答案 -->
-    <div style="background:#e8f8e8;padding:8px 12px;border-radius:5px;margin-bottom:10px;">
-      <span style="color:#27ae60;font-weight:bold;">✅ 正确答案：</span>
-      <span style="color:#333;">{{ q.correct_answer }}</span>
-    </div>
-
-    <!-- 解析 -->
-    {% if q.analysis %}
-    <div style="background:#fff8e1;padding:8px 12px;border-radius:5px;margin-bottom:10px;">
-      <span style="color:#f39c12;font-weight:bold;">💡 解析：</span>
-      <span style="color:#666;font-size:14px;">{{ q.analysis }}</span>
-    </div>
-    {% endif %}
-
-    <!-- 操作按钮 -->
-    <div style="display:flex;gap:10px;margin-top:10px;">
-      <button onclick="removeWrong({{ q.id }}, this)"
-              style="background:none;border:1px solid #ddd;padding:4px 12px;border-radius:5px;color:#888;cursor:pointer;font-size:13px;">
-        ✓ 已掌握，移除
-      </button>
-    </div>
-  </div>
-  {% endfor %}
-
-  <!-- 分页 -->
-  {% if total_pages > 1 %}
-  <div style="display:flex;justify-content:center;gap:10px;margin-top:20px;">
-    {% if page > 1 %}
-    <a href="?page={{ page-1 }}&subject={{ current_subject }}&sort={{ sort }}" class="btn btn-secondary">上一页</a>
-    {% endif %}
-    <span style="padding:8px 15px;color:#666;">{{ page }} / {{ total_pages }}</span>
-    {% if page < total_pages %}
-    <a href="?page={{ page+1 }}&subject={{ current_subject }}&sort={{ sort }}" class="btn btn-secondary">下一页</a>
-    {% endif %}
-  </div>
-  {% endif %}
-
-{% else %}
-  <div style="text-align:center;padding:60px;color:#888;">
-    <div style="font-size:60px;margin-bottom:20px;">🎉</div>
-    <h3>暂无错题</h3>
-    <p>继续保持，你做得很好！</p>
-    <a href="/practice" class="btn btn-primary" style="margin-top:15px;">去练习</a>
-  </div>
-{% endif %}
+<!-- 空状态 -->
+<div id="empty-state" style="display:none;text-align:center;padding:60px;color:#888;">
+  <div style="font-size:60px;margin-bottom:20px;">🎉</div>
+  <h3>暂无错题</h3>
+  <p>继续保持，你做得很好！</p>
+  <a href="/practice" class="btn btn-primary" style="margin-top:15px;">去练习</a>
+</div>
 
 <script>
-function removeWrong(qid, btn) {
-  if (!confirm('确认已掌握该题，从错题本移除？')) return;
-  fetch(`/wrong_book/remove/${qid}`, {method: 'POST'})
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        btn.closest('.card').style.opacity = '0';
-        btn.closest('.card').style.transition = 'opacity 0.3s';
-        setTimeout(() => btn.closest('.card').remove(), 300);
-      }
-    });
+let allWrongData = [];  // 服务器返回的题目详情
+let localWrong   = [];  // 本地错题列表
+
+async function loadWrongBook() {
+  const subject = document.getElementById('filter-subject').value;
+  const sort    = document.getElementById('filter-sort').value;
+
+  // ✅ 从本地获取错题列表
+  localWrong = LocalDB.getWrongList(subject);
+
+  // 排序
+  if (sort === 'most') {
+    localWrong.sort((a, b) => b.wrong_count - a.wrong_count);
+  }
+
+  document.getElementById('wrong-total').textContent = localWrong.length;
+
+  if (localWrong.length === 0) {
+    document.getElementById('wrong-list').innerHTML   = '';
+    document.getElementById('empty-state').style.display = 'block';
+    document.getElementById('practice-wrong-btn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('empty-state').style.display    = 'none';
+  document.getElementById('practice-wrong-btn').style.display = 'inline-block';
+
+  // 从服务器获取题目详情
+  const res  = await fetch('/api/wrong_book/questions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      q_ids:   localWrong.map(w => w.q_id),
+      subject: subject
+    }),
+  });
+  allWrongData = await res.json();
+
+  renderWrongList();
 }
+
+function renderWrongList() {
+  const container = document.getElementById('wrong-list');
+  container.innerHTML = '';
+
+  // 合并本地数据和服务器题目数据
+  const detailMap = {};
+  allWrongData.forEach(q => { detailMap[q.q_id] = q; });
+
+  localWrong.forEach(w => {
+    const q = detailMap[w.q_id];
+    if (!q) return;
+
+    // 等级判断
+    let levelColor = '#e74c3c';
+    let levelText  = '📌 普通错题';
+    if (w.wrong_count >= 4) {
+      levelColor = '#c0392b';
+      levelText  = '⚠️ 高危错题';
+    } else if (w.wrong_count >= 2) {
+      levelColor = '#e67e22';
+      levelText  = '🔶 重点错题';
+    }
+
+    // 上次答案显示
+    let lastAnswerDisplay = w.last_answer || '';
+    if (q.type === '判断题') {
+      lastAnswerDisplay = w.last_answer === 'A' ? '正确' :
+                          w.last_answer === 'B' ? '错误' : w.last_answer;
+    }
+
+    // 选项HTML
+    let optionsHtml = '';
+    if (q.options && q.options.length > 0) {
+      q.options.forEach(opt => {
+        const isCorrect  = q.correct_answer_display.includes(opt.key);
+        const isSelected = (w.last_answer || '').includes(opt.key);
+        let style = 'background:#f9f9f9;border:1px solid #eee;color:#666;';
+        let suffix = '';
+        if (isCorrect) {
+          style  = 'background:#e8f8e8;border:1px solid #27ae60;color:#27ae60;';
+          suffix = ' ✅';
+        } else if (isSelected) {
+          style  = 'background:#ffeaea;border:1px solid #e74c3c;color:#e74c3c;';
+          suffix = ' ❌';
+        }
+        optionsHtml += `
+          <div style="padding:6px 10px;margin:4px 0;border-radius:5px;
+                      font-size:14px;${style}">
+            ${opt.key}. ${opt.text}${suffix}
+          </div>`;
+      });
+    }
+
+    // 解析HTML
+    let expHtml = '';
+    if (q.explanation) {
+      expHtml = `
+        <div style="background:#fff8e1;padding:8px 12px;border-radius:5px;margin-bottom:10px;">
+          <span style="color:#f39c12;font-weight:bold;">💡 解析：</span>
+          <span style="color:#666;font-size:14px;">${q.explanation}</span>
+        </div>`;
+    }
+
+    container.innerHTML += `
+      <div class="card" id="wrong-card-${w.q_id}"
+           style="margin-bottom:15px;border-left:4px solid ${levelColor};">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <div>
+            <span style="background:#ffeaea;color:#e74c3c;padding:2px 8px;
+                         border-radius:10px;font-size:12px;">${q.subject}</span>
+            <span style="background:#f0f0f0;color:#666;padding:2px 8px;
+                         border-radius:10px;font-size:12px;margin-left:5px;">${q.type}</span>
+            <span style="color:${levelColor};font-size:12px;margin-left:8px;">${levelText}</span>
+          </div>
+          <div style="color:#e74c3c;font-size:13px;">
+            错了 <strong>${w.wrong_count}</strong> 次
+          </div>
+        </div>
+
+        <p style="font-size:15px;color:#333;margin-bottom:12px;">${q.stem}</p>
+
+        ${optionsHtml}
+
+        <div style="background:#e8f8e8;padding:8px 12px;border-radius:5px;margin-bottom:10px;">
+          <span style="color:#27ae60;font-weight:bold;">✅ 正确答案：</span>
+          <span style="color:#333;">${q.correct_answer_display}</span>
+          &nbsp;&nbsp;
+          <span style="color:#999;font-size:13px;">上次答案：${lastAnswerDisplay}</span>
+        </div>
+
+        ${expHtml}
+
+        <div style="display:flex;gap:10px;margin-top:10px;">
+          <button onclick="removeWrong('${w.q_id}', this)"
+                  style="background:none;border:1px solid #ddd;padding:4px 12px;
+                         border-radius:5px;color:#888;cursor:pointer;font-size:13px;">
+            ✓ 已掌握，移除
+          </button>
+        </div>
+      </div>`;
+  });
+}
+
+function removeWrong(q_id, btn) {
+  if (!confirm('确认已掌握该题，从错题本移除？')) return;
+
+  // ✅ 直接操作本地存储
+  LocalDB.removeWrong(q_id);
+
+  const card = document.getElementById(`wrong-card-${q_id}`);
+  if (card) {
+    card.style.opacity    = '0';
+    card.style.transition = 'opacity 0.3s';
+    setTimeout(() => {
+      card.remove();
+      // 更新总数
+      localWrong = localWrong.filter(w => w.q_id !== q_id);
+      document.getElementById('wrong-total').textContent = localWrong.length;
+      if (localWrong.length === 0) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('practice-wrong-btn').style.display = 'none';
+      }
+    }, 300);
+  }
+}
+
+async function practiceWrongQuestions() {
+  const wrongIds = localWrong.map(w => w.q_id);
+  if (wrongIds.length === 0) { alert('没有错题可练习'); return; }
+
+  const res  = await fetch('/api/practice/start_by_ids', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_ids: wrongIds }),
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  window.location.href = '/practice';
+}
+
+// 页面加载时读取错题
+document.addEventListener('DOMContentLoaded', loadWrongBook);
 </script>
 
 {% endblock %}
