@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}主页 - 电力刷题系统{% endblock %}
+{% block content %}
+<div class="page-home">
+
+  <!-- 学习计划Banner -->
+  {% if plan_info %}
+  <div class="plan-banner">
+    <div class="plan-item">
+      <span class="plan-num">{{ plan_info.days_left }}</span>
+      <span class="plan-label">距考试天数</span>
+    </div>
+    <div class="plan-divider"></div>
+    <div class="plan-item">
+      <span class="plan-num {{ 'green' if plan_info.today_done >= plan_info.daily_target else 'orange' }}">
+        {{ plan_info.today_done }}/{{ plan_info.daily_target }}
+      </span>
+      <span class="plan-label">今日完成/目标</span>
+    </div>
+    <div class="plan-divider"></div>
+    <div class="plan-item">
+      <span class="plan-num">{{ plan_info.total_remain }}</span>
+      <span class="plan-label">剩余题量</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 今日复习提示 -->
+  {% if today_review > 0 %}
+  <div class="review-alert" onclick="startTodayReview()">
+    🔔 今日有 <strong>{{ today_review }}</strong> 道错题需要复习，点击开始 →
+  </div>
+  {% endif %}
+
+  <!-- 总览统计 -->
+  <div class="stats-overview">
+    <div class="stat-card">
+      <div class="stat-num">{{ total_questions }}</div>
+      <div class="stat-label">题库总题数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num blue">{{ stats.answered }}</div>
+      <div class="stat-label">已做题数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num red">{{ stats.wrong }}</div>
+      <div class="stat-label">错题数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num yellow">{{ stats.favorites }}</div>
+      <div class="stat-label">收藏数</div>
+    </div>
+  </div>
+
+  <!-- 快速入口 -->
+  <div class="quick-title">快速开始</div>
+  <div class="quick-grid">
+    <a href="/practice" class="quick-card">
+      <div class="quick-icon">📝</div>
+      <div class="quick-name">分类练习</div>
+    </a>
+    <a href="/practice?mode=random" class="quick-card">
+      <div class="quick-icon">🎲</div>
+      <div class="quick-name">随机刷题</div>
+    </a>
+    <a href="/wrong_book" class="quick-card">
+      <div class="quick-icon">❌</div>
+      <div class="quick-name">错题本</div>
+    </a>
+    <a href="/exam" class="quick-card">
+      <div class="quick-icon">📋</div>
+      <div class="quick-name">模拟考试</div>
+    </a>
+    <div class="quick-card" onclick="startTodayReview()">
+      <div class="quick-icon">🔄</div>
+      <div class="quick-name">今日复习</div>
+    </div>
+    <a href="/plan" class="quick-card">
+      <div class="quick-icon">🎯</div>
+      <div class="quick-name">学习计划</div>
+    </a>
+  </div>
+
+  <!-- 各专业进度 -->
+  <div class="quick-title">专业进度</div>
+  <div class="subject-list">
+    {% for sub in subjects %}
+    <a href="/practice?subject={{ sub }}" class="subject-card">
+      <div class="subject-name">{{ sub }}专业</div>
+      <div class="subject-bar-wrap">
+        <div class="subject-bar" data-subject="{{ sub }}"></div>
+      </div>
+      <div class="subject-info" id="info-{{ sub }}">加载中...</div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+// 加载各专业进度
+document.addEventListener('DOMContentLoaded', async () => {
+  const subjects = {{ subjects | tojson }};
+  for (const sub of subjects) {
+    try {
+      const res = await fetch(`/api/stats/${encodeURIComponent(sub)}`);
+      const data = await res.json();
+      const pct = data.total ? Math.round(data.answered / data.total * 100) : 0;
+      const bar = document.querySelector(`.subject-bar[data-subject="${sub}"]`);
+      if (bar) {
+        bar.style.width = pct + '%';
+        bar.style.background = pct >= 80 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#3b82f6';
+      }
+      const info = document.getElementById(`info-${sub}`);
+      if (info) {
+        info.textContent = `${data.answered}/${data.total} · 正确率${data.correct_rate}%`;
+      }
+    } catch(e) {}
+  }
+});
+
+async function startTodayReview() {
+  const res = await fetch('/api/today_review');
+  const data = await res.json();
+  if (data.total === 0) {
+    alert('今日没有需要复习的题目 🎉');
+    return;
+  }
+  sessionStorage.setItem('practice_mode', 'review');
+  window.location.href = '/practice/doing';
+}
+</script>
+{% endblock %}

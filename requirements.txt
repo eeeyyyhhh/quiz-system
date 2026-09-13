@@ -1,0 +1,6 @@
+flask==3.0.0
+pandas==2.1.0
+openpyxl==3.1.2
+openai==1.6.1
+flask-cors
+gunicorn

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}错题本{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2>📕 错题本</h2>
+  <p>共有 <strong>{{ total }}</strong> 道错题</p>
+</div>
+
+<!-- 筛选栏 -->
+<div class="card" style="margin-bottom:20px;">
+  <form method="GET" action="/wrong_book" style="display:flex;gap:15px;flex-wrap:wrap;align-items:center;">
+    <select name="subject" class="form-control" style="width:150px;">
+      <option value="">全部科目</option>
+      {% for s in subjects %}
+      <option value="{{ s }}" {% if current_subject == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <select name="sort" class="form-control" style="width:150px;">
+      <option value="recent" {% if sort=='recent' %}selected{% endif %}>最近错误</option>
+      <option value="most" {% if sort=='most' %}selected{% endif %}>错误次数最多</option>
+    </select>
+    <button type="submit" class="btn btn-primary">筛选</button>
+    {% if total > 0 %}
+    <a href="/wrong_book/practice" class="btn btn-success" style="margin-left:auto;">
+      🔄 开始错题练习
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+{% if wrong_questions %}
+  {% for q in wrong_questions %}
+  <div class="card" style="margin-bottom:15px;border-left:4px solid #e74c3c;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+      <div>
+        <span style="background:#ffeaea;color:#e74c3c;padding:2px 8px;border-radius:10px;font-size:12px;">{{ q.subject }}</span>
+        <span style="background:#f0f0f0;color:#666;padding:2px 8px;border-radius:10px;font-size:12px;margin-left:5px;">{{ q.type }}</span>
+      </div>
+      <div style="color:#e74c3c;font-size:13px;">
+        错了 <strong>{{ q.wrong_count }}</strong> 次
+      </div>
+    </div>
+
+    <p style="font-size:15px;color:#333;margin-bottom:12px;">{{ q.question }}</p>
+
+    <!-- 选项 -->
+    {% if q.options %}
+    <div style="margin-bottom:10px;">
+      {% for opt in q.options %}
+      <div style="padding:6px 10px;margin:4px 0;border-radius:5px;font-size:14px;
+        {% if opt == q.correct_answer %}background:#e8f8e8;border:1px solid #27ae60;color:#27ae60;
+        {% elif opt == q.user_answer %}background:#ffeaea;border:1px solid #e74c3c;color:#e74c3c;
+        {% else %}background:#f9f9f9;border:1px solid #eee;color:#666;{% endif %}">
+        {{ opt }}
+        {% if opt == q.correct_answer %} ✅{% endif %}
+        {% if opt == q.user_answer and opt != q.correct_answer %} ❌{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 正确答案 -->
+    <div style="background:#e8f8e8;padding:8px 12px;border-radius:5px;margin-bottom:10px;">
+      <span style="color:#27ae60;font-weight:bold;">✅ 正确答案：</span>
+      <span style="color:#333;">{{ q.correct_answer }}</span>
+    </div>
+
+    <!-- 解析 -->
+    {% if q.analysis %}
+    <div style="background:#fff8e1;padding:8px 12px;border-radius:5px;margin-bottom:10px;">
+      <span style="color:#f39c12;font-weight:bold;">💡 解析：</span>
+      <span style="color:#666;font-size:14px;">{{ q.analysis }}</span>
+    </div>
+    {% endif %}
+
+    <!-- 操作按钮 -->
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button onclick="removeWrong({{ q.id }}, this)"
+              style="background:none;border:1px solid #ddd;padding:4px 12px;border-radius:5px;color:#888;cursor:pointer;font-size:13px;">
+        ✓ 已掌握，移除
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- 分页 -->
+  {% if total_pages > 1 %}
+  <div style="display:flex;justify-content:center;gap:10px;margin-top:20px;">
+    {% if page > 1 %}
+    <a href="?page={{ page-1 }}&subject={{ current_subject }}&sort={{ sort }}" class="btn btn-secondary">上一页</a>
+    {% endif %}
+    <span style="padding:8px 15px;color:#666;">{{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="?page={{ page+1 }}&subject={{ current_subject }}&sort={{ sort }}" class="btn btn-secondary">下一页</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+{% else %}
+  <div style="text-align:center;padding:60px;color:#888;">
+    <div style="font-size:60px;margin-bottom:20px;">🎉</div>
+    <h3>暂无错题</h3>
+    <p>继续保持，你做得很好！</p>
+    <a href="/practice" class="btn btn-primary" style="margin-top:15px;">去练习</a>
+  </div>
+{% endif %}
+
+<script>
+function removeWrong(qid, btn) {
+  if (!confirm('确认已掌握该题，从错题本移除？')) return;
+  fetch(`/wrong_book/remove/${qid}`, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.closest('.card').style.opacity = '0';
+        btn.closest('.card').style.transition = 'opacity 0.3s';
+        setTimeout(() => btn.closest('.card').remove(), 300);
+      }
+    });
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}练习 - 电力刷题系统{% endblock %}
+{% block content %}
+<!-- 设置面板 -->
+<div id="setup-panel" class="setup-panel">
+  <h2 class="panel-title">📝 开始练习</h2>
+
+  <div class="form-group">
+    <label>选择专业</label>
+    <div class="btn-group" id="subject-group">
+      <button class="opt-btn active" data-val="">全部专业</button>
+      {% for sub in subjects %}
+      <button class="opt-btn" data-val="{{ sub }}">{{ sub }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>题目类型</label>
+    <div class="btn-group" id="type-group">
+      <button class="opt-btn active" data-val="">全部题型</button>
+      {% for t in q_types %}
+      <button class="opt-btn" data-val="{{ t }}">{{ t }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>练习模式</label>
+    <div class="btn-group" id="mode-group">
+      <button class="opt-btn active" data-val="order">顺序练习</button>
+      <button class="opt-btn" data-val="random">随机练习</button>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>题目筛选</label>
+    <div class="btn-group" id="filter-group">
+      <button class="opt-btn active" data-val="all">全部题目</button>
+      <button class="opt-btn" data-val="undone">只练未做</button>
+      <button class="opt-btn" data-val="done">只练已做</button>
+      <button class="opt-btn" data-val="wrong">只练错题</button>
+      <button class="opt-btn" data-val="favorite">只练收藏</button>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>题号范围（可选）</label>
+    <div class="range-row">
+      <input type="number" id="range-start" placeholder="起始题号" min="1">
+      <span>—</span>
+      <input type="number" id="range-end" placeholder="结束题号" min="1">
+    </div>
+  </div>
+
+  <button class="btn-primary btn-full" onclick="startPractice()">开始练习</button>
+</div>
+
+<!-- 练习区域（做题时显示） -->
+<div id="practice-area" class="practice-area hidden">
+  <!-- 进度条 -->
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+  <div class="progress-text">
+    <span id="progress-label">1 / 100</span>
+    <span id="subject-type-label"></span>
+  </div>
+
+  <!-- 题目卡片 -->
+  <div class="question-card">
+    <div class="question-header">
+      <span class="q-type-badge" id="q-type-badge"></span>
+      <span class="q-subject-badge" id="q-subject-badge"></span>
+      <button class="btn-icon" id="fav-btn" onclick="toggleFavorite()" title="收藏">☆</button>
+    </div>
+
+    <div class="question-stem" id="question-stem"></div>
+
+    <div class="options-list" id="options-list"></div>
+
+    <!-- 多选题提交按钮 -->
+    <button class="btn-submit-multi hidden" id="submit-multi-btn" onclick="submitMultiAnswer()">
+      ✓ 提交答案
+    </button>
+  </div>
+
+  <!-- 答题结果（答完后显示） -->
+  <div class="result-card hidden" id="result-card">
+    <div class="result-header" id="result-header"></div>
+    <div class="result-answer" id="result-answer"></div>
+
+    <!-- 解析区域 -->
+    <div class="explanation-box" id="explanation-box">
+      <div class="exp-title">📖 解析</div>
+      <div class="exp-content" id="exp-content">暂无解析</div>
+      <div class="exp-actions">
+        <button class="btn-sm" onclick="showAiExplanation()">🤖 AI生成解析</button>
+        <button class="btn-sm" onclick="showEditExplanation()">✏️ 手动添加</button>
+      </div>
+      <div class="exp-edit hidden" id="exp-edit">
+        <textarea id="exp-textarea" rows="4" placeholder="输入解析内容..."></textarea>
+        <button class="btn-sm btn-blue" onclick="saveExplanation()">保存</button>
+        <button class="btn-sm" onclick="hideEditExplanation()">取消</button>
+      </div>
+    </div>
+
+    <!-- 笔记区域 -->
+    <div class="note-box">
+      <div class="note-title">📝 我的笔记</div>
+      <textarea class="note-textarea" id="note-textarea"
+                placeholder="在这里记录你的笔记..." rows="3"
+                onblur="saveNote()"></textarea>
+    </div>
+  </div>
+
+  <!-- 底部导航按钮 -->
+  <div class="bottom-nav">
+    <button class="btn-nav" id="prev-btn" onclick="prevQuestion()">‹ 上一题</button>
+    <button class="btn-nav btn-nav-mid" onclick="goToIndex()">跳转</button>
+    <button class="btn-nav btn-primary" id="next-btn" onclick="nextQuestion()">下一题 ›</button>
+  </div>
+</div>
+
+<script>
+let currentQ = null;
+let selectedOptions = [];
+let answered = false;
+
+// ====== 选项组单选逻辑 ======
+document.querySelectorAll('.btn-group').forEach(group => {
+  group.addEventListener('click', e => {
+    if (!e.target.classList.contains('opt-btn')) return;
+    group.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+  });
+});
+
+function getGroupVal(id) {
+  const btn = document.querySelector(`#${id} .opt-btn.active`);
+  return btn ? btn.dataset.val : '';
+}
+
+async function startPractice() {
+  const payload = {
+    subject:      getGroupVal('subject-group'),
+    q_type:       getGroupVal('type-group'),
+    mode:         getGroupVal('mode-group'),
+    filter_mode:  getGroupVal('filter-group'),
+    range_start:  document.getElementById('range-start').value || 1,
+    range_end:    document.getElementById('range-end').value || null,
+  };
+
+  const res = await fetch('/api/practice/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+
+  if (data.error) { alert(data.error); return; }
+
+  document.getElementById('setup-panel').classList.add('hidden');
+  document.getElementById('practice-area').classList.remove('hidden');
+  renderQuestion(data.first_q);
+}
+
+function renderQuestion(q) {
+  currentQ = q;
+  answered = false;
+  selectedOptions = [];
+
+  // 进度
+  const pct = Math.round((q.index + 1) / q.total * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${q.index + 1} / ${q.total}`;
+  document.getElementById('subject-type-label').textContent = `${q.subject} · ${q.type}`;
+
+  // 题型/专业标签
+  document.getElementById('q-type-badge').textContent = q.type;
+  document.getElementById('q-subject-badge').textContent = q.subject;
+
+  // 收藏按钮
+  document.getElementById('fav-btn').textContent = q.is_favorite ? '★' : '☆';
+  document.getElementById('fav-btn').classList.toggle('favorited', q.is_favorite);
+
+  // 题干
+  document.getElementById('question-stem').textContent = q.stem;
+
+  // 选项
+  const optList = document.getElementById('options-list');
+  optList.innerHTML = '';
+  q.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.dataset.key = opt.key;
+    btn.innerHTML = `<span class="opt-key">${opt.key}</span><span class="opt-text">${opt.text}</span>`;
+    btn.onclick = () => selectOption(opt.key, q.type);
+    optList.appendChild(btn);
+  });
+
+  // 多选题显示提交按钮
+  const multiBtn = document.getElementById('submit-multi-btn');
+  if (q.type === '多选题') {
+    multiBtn.classList.remove('hidden');
+  } else {
+    multiBtn.classList.add('hidden');
+  }
+
+  // 隐藏结果
+  document.getElementById('result-card').classList.add('hidden');
+
+  // 笔记
+  document.getElementById('note-textarea').value = q.note || '';
+
+  // 上一题按钮
+  document.getElementById('prev-btn').disabled = q.index === 0;
+  document.getElementById('next-btn').textContent = q.index === q.total - 1 ? '完成 ✓' : '下一题 ›';
+
+  window.scrollTo(0, 0);
+}
+
+function selectOption(key, qType) {
+  if (answered) return;
+
+  if (qType === '多选题') {
+    // 多选：toggle
+    const idx = selectedOptions.indexOf(key);
+    if (idx >= 0) {
+      selectedOptions.splice(idx, 1);
+    } else {
+      selectedOptions.push(key);
+    }
+    document.querySelectorAll('.option-btn').forEach(btn => {
+      btn.classList.toggle('selected', selectedOptions.includes(btn.dataset.key));
+    });
+  } else {
+    // 单选/判断：直接提交
+    selectedOptions = [key];
+    submitAnswer(key);
+  }
+}
+
+async function submitMultiAnswer() {
+  if (selectedOptions.length === 0) { alert('请至少选择一个选项'); return; }
+  await submitAnswer(selectedOptions.sort().join(''));
+}
+
+async function submitAnswer(userAnswer) {
+  answered = true;
+
+  const res = await fetch('/api/practice/answer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_id: currentQ.q_id, answer: userAnswer }),
+  });
+  const data = await res.json();
+
+  // 标记选项颜色
+  document.querySelectorAll('.option-btn').forEach(btn => {
+    const key = btn.dataset.key;
+    const isCorrectKey = data.correct_answer.includes(key);
+    const isSelectedKey = userAnswer.includes(key);
+
+    if (isCorrectKey) {
+      btn.classList.add('correct');
+    } else if (isSelectedKey && !isCorrectKey) {
+      btn.classList.add('wrong');
+    }
+    btn.disabled = true;
+  });
+
+  // 显示结果
+  const resultCard = document.getElementById('result-card');
+  resultCard.classList.remove('hidden');
+
+  const header = document.getElementById('result-header');
+  header.textContent = data.correct ? '✅ 回答正确！' : '❌ 回答错误';
+  header.className = 'result-header ' + (data.correct ? 'correct' : 'wrong');
+
+  document.getElementById('result-answer').innerHTML =
+    `正确答案：<strong>${data.correct_answer}</strong>` +
+    (!data.correct ? `　你的答案：<span class="wrong-text">${userAnswer}</span>` : '') +
+    (data.wrong_count > 0 ? `　<span class="wrong-count">已错 ${data.wrong_count} 次</span>` : '');
+
+  // 解析
+  const expContent = document.getElementById('exp-content');
+  expContent.textContent = data.explanation || '暂无解析，可点击下方按钮生成';
+
+  resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function nextQuestion() {
+  if (!currentQ) return;
+  if (currentQ.index === currentQ.total - 1) {
+    if (confirm('已完成所有题目！返回练习设置？')) {
+      location.reload();
+    }
+    return;
+  }
+  const res = await fetch(`/api/practice/question/${currentQ.index + 1}`);
+  const q   = await res.json();
+  renderQuestion(q);
+}
+
+async function prevQuestion() {
+  if (!currentQ || currentQ.index === 0) return;
+  const res = await fetch(`/api/practice/question/${currentQ.index - 1}`);
+  const q   = await res.json();
+  renderQuestion(q);
+}
+
+function goToIndex() {
+  const idx = parseInt(prompt(`跳转到第几题？（1-${currentQ.total}）`));
+  if (isNaN(idx) || idx < 1 || idx > currentQ.total) return;
+  fetch(`/api/practice/question/${idx - 1}`)
+    .then(r => r.json()).then(renderQuestion);
+}
+
+async function toggleFavorite() {
+  const res = await fetch('/api/favorite', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_id: currentQ.q_id, subject: currentQ.subject }),
+  });
+  const data = await res.json();
+  const btn = document.getElementById('fav-btn');
+  btn.textContent = data.favorited ? '★' : '☆';
+  btn.classList.toggle('favorited', data.favorited);
+  currentQ.is_favorite = data.favorited;
+}
+
+async function saveNote() {
+  const content = document.getElementById('note-textarea').value;
+  await fetch('/api/note', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_id: currentQ.q_id, content }),
+  });
+}
+
+function showEditExplanation() {
+  document.getElementById('exp-edit').classList.remove('hidden');
+  document.getElementById('exp-textarea').value =
+    document.getElementById('exp-content').textContent === '暂无解析，可点击下方按钮生成'
+      ? '' : document.getElementById('exp-content').textContent;
+}
+function hideEditExplanation() {
+  document.getElementById('exp-edit').classList.add('hidden');
+}
+async function saveExplanation() {
+  const content = document.getElementById('exp-textarea').value;
+  await fetch('/api/explanation', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_id: currentQ.q_id, content, source: 'manual' }),
+  });
+  document.getElementById('exp-content').textContent = content;
+  hideEditExplanation();
+}
+async function showAiExplanation() {
+  const btn = event.target;
+  btn.textContent = '🤖 生成中...';
+  btn.disabled = true;
+  const res = await fetch('/api/explanation/ai', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ q_id: currentQ.q_id }),
+  });
+  const data = await res.json();
+  document.getElementById('exp-content').textContent = data.content || '生成失败';
+  btn.textContent = '🤖 AI生成解析';
+  btn.disabled = false;
+}
+</script>
+{% endblock %}

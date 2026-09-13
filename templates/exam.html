@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}模拟考试{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h2>📝 模拟考试</h2>
+  <p>模拟真实考试环境，限时作答</p>
+</div>
+
+{% if not exam_started %}
+<!-- 考试配置界面 -->
+<div class="card" style="max-width:500px;margin:40px auto;">
+  <h3 style="margin-bottom:20px;color:#333">考试设置</h3>
+  <form method="POST" action="/exam/start">
+    <div class="form-group">
+      <label>选择科目</label>
+      <select name="subject" class="form-control">
+        <option value="all">全部科目</option>
+        {% for s in subjects %}
+        <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="margin-top:15px">
+      <label>题目数量</label>
+      <select name="count" class="form-control">
+        <option value="20">20题</option>
+        <option value="40">40题</option>
+        <option value="60" selected>60题</option>
+        <option value="100">100题</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-top:15px">
+      <label>限制时间</label>
+      <select name="duration" class="form-control">
+        <option value="30">30分钟</option>
+        <option value="60" selected>60分钟</option>
+        <option value="90">90分钟</option>
+        <option value="120">120分钟</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%;margin-top:20px;padding:12px;font-size:16px;">
+      🚀 开始考试
+    </button>
+  </form>
+</div>
+
+{% else %}
+<!-- 考试进行中 -->
+<div id="exam-container">
+  <!-- 顶部计时器 -->
+  <div style="position:sticky;top:0;background:#fff;padding:10px 0;border-bottom:1px solid #eee;z-index:100;display:flex;justify-content:space-between;align-items:center;">
+    <span style="font-size:16px;color:#333">共 {{ questions|length }} 题</span>
+    <span id="timer" style="font-size:20px;font-weight:bold;color:#e74c3c;">
+      ⏱ <span id="time-display">{{ duration }}:00</span>
+    </span>
+    <button onclick="submitExam()" class="btn btn-danger" style="padding:8px 20px;">
+      提交试卷
+    </button>
+  </div>
+
+  <form id="exam-form" method="POST" action="/exam/submit">
+    <input type="hidden" name="start_time" value="{{ start_time }}">
+    <input type="hidden" name="duration" value="{{ duration }}">
+
+    {% for q in questions %}
+    <div class="question-card" id="qcard-{{ loop.index }}" style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin:15px 0;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <span style="color:#888;font-size:14px;">第 {{ loop.index }} 题</span>
+        <span style="background:#f0f0f0;padding:2px 8px;border-radius:10px;font-size:12px;">{{ q.type }}</span>
+      </div>
+      <p style="font-size:16px;color:#333;margin-bottom:15px;">{{ q.question }}</p>
+
+      <input type="hidden" name="qid_{{ loop.index }}" value="{{ q.id }}">
+
+      {% if q.type == '判断题' %}
+        <label style="display:block;padding:8px;margin:5px 0;cursor:pointer;border-radius:5px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+          <input type="radio" name="ans_{{ loop.index }}" value="正确" onchange="markAnswered({{ loop.index }})"> 正确
+        </label>
+        <label style="display:block;padding:8px;margin:5px 0;cursor:pointer;border-radius:5px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+          <input type="radio" name="ans_{{ loop.index }}" value="错误" onchange="markAnswered({{ loop.index }})"> 错误
+        </label>
+      {% else %}
+        {% for opt in q.options %}
+        <label style="display:block;padding:8px;margin:5px 0;cursor:pointer;border-radius:5px;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+          {% if q.type == '多选题' %}
+          <input type="checkbox" name="ans_{{ loop.index }}" value="{{ opt }}" onchange="markAnswered({{ loop.index0 + 1 }})"> {{ opt }}
+          {% else %}
+          <input type="radio" name="ans_{{ loop.index }}" value="{{ opt }}" onchange="markAnswered({{ loop.index0 + 1 }})"> {{ opt }}
+          {% endif %}
+        </label>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <!-- 答题卡 -->
+    <div style="position:fixed;right:20px;top:100px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:15px;width:200px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+      <p style="font-size:14px;font-weight:bold;margin-bottom:10px;">答题卡</p>
+      <div id="answer-card" style="display:flex;flex-wrap:wrap;gap:5px;">
+        {% for q in questions %}
+        <div id="dot-{{ loop.index }}"
+             onclick="scrollToQuestion({{ loop.index }})"
+             style="width:28px;height:28px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;">
+          {{ loop.index }}
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" onclick="submitExam()" class="btn btn-danger" style="width:100%;margin-top:15px;">
+        提交
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// 倒计时
+let totalSeconds = {{ duration }} * 60;
+const timerDisplay = document.getElementById('time-display');
+
+const countdown = setInterval(() => {
+  totalSeconds--;
+  if (totalSeconds <= 0) {
+    clearInterval(countdown);
+    alert('时间到！自动提交试卷');
+    submitExam();
+    return;
+  }
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  timerDisplay.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  if (totalSeconds <= 300) {
+    timerDisplay.parentElement.style.color = '#e74c3c';
+  }
+}, 1000);
+
+// 标记已答
+function markAnswered(index) {
+  const dot = document.getElementById(`dot-${index}`);
+  if (dot) dot.style.background = '#27ae60';
+}
+
+// 滚动到题目
+function scrollToQuestion(index) {
+  const el = document.getElementById(`qcard-${index}`);
+  if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+// 提交
+function submitExam() {
+  clearInterval(countdown);
+  if (confirm('确认提交试卷？')) {
+    document.getElementById('exam-form').submit();
+  }
+}
+</script>
+{% endif %}
+
+{% endblock %}
