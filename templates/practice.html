@@ -253,7 +253,6 @@ function renderQuestion(q) {
   document.getElementById('next-btn').textContent =
     q.index === q.total - 1 ? '完成 ✓' : '下一题 ›';
 
-  // 首题显示滑动提示
   if (q.index === 0) showSwipeHint('💡 答题后可左右滑动切换题目');
 
   window.scrollTo(0, 0);
@@ -283,7 +282,7 @@ async function submitMultiAnswer() {
 }
 
 // ============================================================
-// 提交答案
+// 提交答案 ✅ 修复标色逻辑
 // ============================================================
 async function submitAnswer(userAnswer) {
   answered = true;
@@ -305,14 +304,35 @@ async function submitAnswer(userAnswer) {
     userAnswer, data.correct
   );
 
-  // 标记选项颜色
+  // ✅ 修复标色逻辑：区分判断题和单选/多选题
+  const qType         = currentQ.type;
+  const correctAnswer = data.correct_answer;
+
   document.querySelectorAll('.option-btn').forEach(btn => {
     const key = btn.dataset.key;
-    if (data.correct_answer.includes(key)) btn.classList.add('correct');
-    else if (userAnswer.includes(key))     btn.classList.add('wrong');
+
+    let isCorrectOption = false;
+    let isUserSelected  = false;
+
+    if (qType === '判断题') {
+      // 判断题：key是中文（"正确"/"错误"），用全等比较，避免includes误匹配
+      isCorrectOption = (key === correctAnswer);
+      isUserSelected  = (key === userAnswer);
+    } else {
+      // 单选/多选：key是字母（A/B/C/D），split逐字母比较
+      isCorrectOption = correctAnswer.split('').includes(key);
+      isUserSelected  = userAnswer.split('').includes(key);
+    }
+
+    if (isCorrectOption) {
+      btn.classList.add('correct');       // ✅ 正确答案标绿
+    } else if (isUserSelected) {
+      btn.classList.add('wrong');         // ❌ 用户选错才标红
+    }
     btn.disabled = true;
   });
 
+  // 结果卡片
   const resultCard = document.getElementById('result-card');
   resultCard.classList.remove('hidden');
 
@@ -424,7 +444,7 @@ async function showAiExplanation() {
 // ============================================================
 function showSwipeHint(msg) {
   const hint = document.getElementById('swipe-hint');
-  hint.textContent  = msg;
+  hint.textContent    = msg;
   hint.style.display  = 'block';
   hint.style.opacity  = '1';
   clearTimeout(hint._timer);
@@ -441,7 +461,7 @@ function showSwipeHint(msg) {
   let startX    = 0;
   let startY    = 0;
   let startTime = 0;
-  let isSwiping = false;   // 判断本次触摸是否判定为横向滑动
+  let isSwiping = false;
 
   const area = document.getElementById('practice-area');
 
@@ -452,14 +472,12 @@ function showSwipeHint(msg) {
     isSwiping = false;
   }, { passive: true });
 
-  // touchmove 阶段：如果已确认是横向滑动，阻止页面上下滚动
   area.addEventListener('touchmove', e => {
     const dx = e.touches[0].clientX - startX;
     const dy = e.touches[0].clientY - startY;
     if (!isSwiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       isSwiping = true;
     }
-    // 横向滑动时阻止垂直滚动，避免页面抖动
     if (isSwiping) e.preventDefault();
   }, { passive: false });
 
@@ -470,22 +488,16 @@ function showSwipeHint(msg) {
     const deltaY  = endY - startY;
     const elapsed = Date.now() - startTime;
 
-    // 触发条件：
-    //   水平位移 > 60px
-    //   水平位移 > 垂直位移 × 1.5（防上下滚动误触）
-    //   耗时 < 400ms（快速滑动）
     if (
       Math.abs(deltaX) > 60 &&
       Math.abs(deltaX) > Math.abs(deltaY) * 1.5 &&
       elapsed < 400
     ) {
-      // 未作答：提示 + 震动，不切题
       if (!answered) {
         if (navigator.vibrate) navigator.vibrate(40);
         showSwipeHint(deltaX < 0 ? '请先作答再切换 →' : '← 请先作答再切换');
         return;
       }
-      // 左滑 → 下一题，右滑 → 上一题
       if (deltaX < 0) nextQuestion();
       else            prevQuestion();
     }
