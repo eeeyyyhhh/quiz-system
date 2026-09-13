@@ -68,7 +68,7 @@
   </div>
 
   <!-- 题目卡片 -->
-  <div class="question-card">
+  <div class="question-card" id="question-card">
     <div class="question-header">
       <span class="q-type-badge" id="q-type-badge"></span>
       <span class="q-subject-badge" id="q-subject-badge"></span>
@@ -118,12 +118,32 @@
   </div>
 </div>
 
-<script>
-let currentQ      = null;
-let selectedOptions = [];
-let answered      = false;
+<!-- 滑动提示气泡 -->
+<div id="swipe-hint" style="
+  display: none;
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.62);
+  color: #fff;
+  padding: 8px 22px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 999;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.3s;
+"></div>
 
+<script>
+let currentQ        = null;
+let selectedOptions = [];
+let answered        = false;
+
+// ============================================================
 // 选项组单选逻辑
+// ============================================================
 document.querySelectorAll('.btn-group').forEach(group => {
   group.addEventListener('click', e => {
     if (!e.target.classList.contains('opt-btn')) return;
@@ -137,19 +157,21 @@ function getGroupVal(id) {
   return btn ? btn.dataset.val : '';
 }
 
+// ============================================================
+// 开始练习
+// ============================================================
 async function startPractice() {
   const filterMode = getGroupVal('filter-group');
   const subject    = getGroupVal('subject-group');
   const q_type     = getGroupVal('type-group');
   const mode       = getGroupVal('mode-group');
 
-  // 从服务器获取题目ID列表
   const params = new URLSearchParams();
   if (subject) params.append('subject', subject);
   if (q_type)  params.append('q_type', q_type);
 
-  const res    = await fetch('/api/local/question_ids?' + params.toString());
-  let allIds   = await res.json();
+  const res  = await fetch('/api/local/question_ids?' + params.toString());
+  let allIds = await res.json();
 
   // 题号范围过滤
   const rangeStart = parseInt(document.getElementById('range-start').value) || 1;
@@ -166,31 +188,19 @@ async function startPractice() {
   const wrongIds    = LocalDB.getWrongIds(subject);
   const favIds      = LocalDB.getFavoriteIds(subject);
 
-  if (filterMode === 'undone') {
-    allIds = allIds.filter(q => !answeredIds.has(q.q_id));
-  } else if (filterMode === 'done') {
-    allIds = allIds.filter(q => answeredIds.has(q.q_id));
-  } else if (filterMode === 'wrong') {
-    allIds = allIds.filter(q => wrongIds.has(q.q_id));
-  } else if (filterMode === 'favorite') {
-    allIds = allIds.filter(q => favIds.has(q.q_id));
-  }
+  if      (filterMode === 'undone')   allIds = allIds.filter(q => !answeredIds.has(q.q_id));
+  else if (filterMode === 'done')     allIds = allIds.filter(q =>  answeredIds.has(q.q_id));
+  else if (filterMode === 'wrong')    allIds = allIds.filter(q =>  wrongIds.has(q.q_id));
+  else if (filterMode === 'favorite') allIds = allIds.filter(q =>  favIds.has(q.q_id));
 
-  if (allIds.length === 0) {
-    alert('没有符合条件的题目');
-    return;
-  }
+  if (allIds.length === 0) { alert('没有符合条件的题目'); return; }
 
-  // 随机模式
-  if (mode === 'random') {
-    allIds = allIds.sort(() => Math.random() - 0.5);
-  }
+  if (mode === 'random') allIds = allIds.sort(() => Math.random() - 0.5);
 
-  // 发给服务器开始练习
   const startRes = await fetch('/api/practice/start_by_ids', {
-    method: 'POST',
+    method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ q_ids: allIds.map(q => q.q_id) }),
+    body:    JSON.stringify({ q_ids: allIds.map(q => q.q_id) }),
   });
   const data = await startRes.json();
   if (data.error) { alert(data.error); return; }
@@ -200,20 +210,22 @@ async function startPractice() {
   renderQuestion(data.first_q);
 }
 
+// ============================================================
+// 渲染题目
+// ============================================================
 function renderQuestion(q) {
   currentQ        = q;
   answered        = false;
   selectedOptions = [];
 
-  // ✅ 收藏状态从本地读
   q.is_favorite = LocalDB.isFavorite(q.q_id);
 
   const pct = Math.round((q.index + 1) / q.total * 100);
-  document.getElementById('progress-bar').style.width      = pct + '%';
-  document.getElementById('progress-label').textContent    = `${q.index + 1} / ${q.total}`;
+  document.getElementById('progress-bar').style.width       = pct + '%';
+  document.getElementById('progress-label').textContent     = `${q.index + 1} / ${q.total}`;
   document.getElementById('subject-type-label').textContent = `${q.subject} · ${q.type}`;
-  document.getElementById('q-type-badge').textContent      = q.type;
-  document.getElementById('q-subject-badge').textContent   = q.subject;
+  document.getElementById('q-type-badge').textContent       = q.type;
+  document.getElementById('q-subject-badge').textContent    = q.subject;
 
   const favBtn = document.getElementById('fav-btn');
   favBtn.textContent = q.is_favorite ? '★' : '☆';
@@ -237,20 +249,25 @@ function renderQuestion(q) {
     .classList.toggle('hidden', q.type !== '多选题');
   document.getElementById('result-card').classList.add('hidden');
   document.getElementById('note-textarea').value = q.note || '';
-  document.getElementById('prev-btn').disabled =
-    q.index === 0;
+  document.getElementById('prev-btn').disabled   = q.index === 0;
   document.getElementById('next-btn').textContent =
     q.index === q.total - 1 ? '完成 ✓' : '下一题 ›';
+
+  // 首题显示滑动提示
+  if (q.index === 0) showSwipeHint('💡 答题后可左右滑动切换题目');
 
   window.scrollTo(0, 0);
 }
 
+// ============================================================
+// 选项点击
+// ============================================================
 function selectOption(key, qType) {
   if (answered) return;
   if (qType === '多选题') {
     const idx = selectedOptions.indexOf(key);
     if (idx >= 0) selectedOptions.splice(idx, 1);
-    else selectedOptions.push(key);
+    else          selectedOptions.push(key);
     document.querySelectorAll('.option-btn').forEach(btn => {
       btn.classList.toggle('selected', selectedOptions.includes(btn.dataset.key));
     });
@@ -265,17 +282,20 @@ async function submitMultiAnswer() {
   await submitAnswer(selectedOptions.sort().join(''));
 }
 
+// ============================================================
+// 提交答案
+// ============================================================
 async function submitAnswer(userAnswer) {
   answered = true;
 
   const res  = await fetch('/api/practice/answer', {
-    method: 'POST',
+    method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ q_id: currentQ.q_id, answer: userAnswer }),
+    body:    JSON.stringify({ q_id: currentQ.q_id, answer: userAnswer }),
   });
   const data = await res.json();
 
-  // ✅ 存到本地
+  // ✅ 存本地
   LocalDB.recordAnswer(
     currentQ.q_id, currentQ.subject, currentQ.type,
     userAnswer, data.correct
@@ -300,7 +320,6 @@ async function submitAnswer(userAnswer) {
   header.textContent = data.correct ? '✅ 回答正确！' : '❌ 回答错误';
   header.className   = 'result-header ' + (data.correct ? 'correct' : 'wrong');
 
-  // ✅ 错题次数从本地读
   const wrongEntry = (LocalDB._get('wrong_book') || {})[currentQ.q_id];
   const wrongCount = wrongEntry ? wrongEntry.wrong_count : 0;
 
@@ -317,6 +336,9 @@ async function submitAnswer(userAnswer) {
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// ============================================================
+// 题目导航
+// ============================================================
 async function nextQuestion() {
   if (!currentQ) return;
   if (currentQ.index === currentQ.total - 1) {
@@ -340,7 +362,9 @@ function goToIndex() {
     .then(r => r.json()).then(renderQuestion);
 }
 
-// ✅ 收藏改用本地存储
+// ============================================================
+// 收藏
+// ============================================================
 function toggleFavorite() {
   const status = LocalDB.toggleFavorite(currentQ.q_id, currentQ.subject);
   const btn    = document.getElementById('fav-btn');
@@ -349,12 +373,15 @@ function toggleFavorite() {
   currentQ.is_favorite = status;
 }
 
+// ============================================================
+// 笔记 / 解析
+// ============================================================
 async function saveNote() {
   const content = document.getElementById('note-textarea').value;
   await fetch('/api/note', {
-    method: 'POST',
+    method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ q_id: currentQ.q_id, content }),
+    body:    JSON.stringify({ q_id: currentQ.q_id, content }),
   });
 }
 
@@ -370,9 +397,9 @@ function hideEditExplanation() {
 async function saveExplanation() {
   const content = document.getElementById('exp-textarea').value;
   await fetch('/api/explanation', {
-    method: 'POST',
+    method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ q_id: currentQ.q_id, content, source: 'manual' }),
+    body:    JSON.stringify({ q_id: currentQ.q_id, content, source: 'manual' }),
   });
   document.getElementById('exp-content').textContent = content;
   hideEditExplanation();
@@ -382,14 +409,87 @@ async function showAiExplanation() {
   btn.textContent = '🤖 生成中...';
   btn.disabled    = true;
   const res  = await fetch('/api/explanation/ai', {
-    method: 'POST',
+    method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ q_id: currentQ.q_id }),
+    body:    JSON.stringify({ q_id: currentQ.q_id }),
   });
   const data = await res.json();
   document.getElementById('exp-content').textContent = data.content || '生成失败';
   btn.textContent = '🤖 AI生成解析';
   btn.disabled    = false;
 }
+
+// ============================================================
+// 滑动提示气泡
+// ============================================================
+function showSwipeHint(msg) {
+  const hint = document.getElementById('swipe-hint');
+  hint.textContent  = msg;
+  hint.style.display  = 'block';
+  hint.style.opacity  = '1';
+  clearTimeout(hint._timer);
+  hint._timer = setTimeout(() => {
+    hint.style.opacity = '0';
+    setTimeout(() => { hint.style.display = 'none'; }, 300);
+  }, 1800);
+}
+
+// ============================================================
+// 左右滑动切换题目
+// ============================================================
+(function initSwipe() {
+  let startX    = 0;
+  let startY    = 0;
+  let startTime = 0;
+  let isSwiping = false;   // 判断本次触摸是否判定为横向滑动
+
+  const area = document.getElementById('practice-area');
+
+  area.addEventListener('touchstart', e => {
+    startX    = e.touches[0].clientX;
+    startY    = e.touches[0].clientY;
+    startTime = Date.now();
+    isSwiping = false;
+  }, { passive: true });
+
+  // touchmove 阶段：如果已确认是横向滑动，阻止页面上下滚动
+  area.addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!isSwiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      isSwiping = true;
+    }
+    // 横向滑动时阻止垂直滚动，避免页面抖动
+    if (isSwiping) e.preventDefault();
+  }, { passive: false });
+
+  area.addEventListener('touchend', e => {
+    const endX    = e.changedTouches[0].clientX;
+    const endY    = e.changedTouches[0].clientY;
+    const deltaX  = endX - startX;
+    const deltaY  = endY - startY;
+    const elapsed = Date.now() - startTime;
+
+    // 触发条件：
+    //   水平位移 > 60px
+    //   水平位移 > 垂直位移 × 1.5（防上下滚动误触）
+    //   耗时 < 400ms（快速滑动）
+    if (
+      Math.abs(deltaX) > 60 &&
+      Math.abs(deltaX) > Math.abs(deltaY) * 1.5 &&
+      elapsed < 400
+    ) {
+      // 未作答：提示 + 震动，不切题
+      if (!answered) {
+        if (navigator.vibrate) navigator.vibrate(40);
+        showSwipeHint(deltaX < 0 ? '请先作答再切换 →' : '← 请先作答再切换');
+        return;
+      }
+      // 左滑 → 下一题，右滑 → 上一题
+      if (deltaX < 0) nextQuestion();
+      else            prevQuestion();
+    }
+  }, { passive: true });
+})();
 </script>
 {% endblock %}
