@@ -47,98 +47,159 @@
   <!-- 顶部状态栏 -->
   <div style="position:sticky;top:0;background:#fff;z-index:100;
               border-bottom:1px solid #eee;padding:10px 15px;
-              display:flex;justify-content:space-between;align-items:center;">
-    <div style="font-size:14px;color:#666;">
-      已答 <span id="answered-count"
-                style="font-weight:bold;color:#3b82f6;">0</span> / 120
+              display:flex;justify-content:space-between;align-items:center;
+              box-shadow:0 2px 6px rgba(0,0,0,0.06);">
+
+    <!-- 左：已答数 -->
+    <div style="font-size:13px;color:#666;">
+      已答
+      <span id="answered-count"
+            style="font-weight:bold;color:#3b82f6;">0</span>/120
     </div>
+
+    <!-- 中：倒计时 -->
     <div id="timer-box"
-         style="font-size:20px;font-weight:bold;color:#e74c3c;">
+         style="font-size:18px;font-weight:bold;color:#333;">
       ⏱ <span id="time-display">60:00</span>
     </div>
-    <button onclick="confirmSubmit()"
-            style="background:#e74c3c;color:#fff;border:none;
-                   padding:8px 18px;border-radius:6px;cursor:pointer;
-                   font-size:14px;">
-      提交试卷
-    </button>
+
+    <!-- 右：答题卡按钮 + 提交 -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="toggleSheet()"
+              style="background:#f0f4ff;color:#3b82f6;border:1px solid #c7d7ff;
+                     padding:6px 12px;border-radius:6px;cursor:pointer;
+                     font-size:13px;">
+        📋 答题卡
+      </button>
+      <button onclick="confirmSubmit()"
+              style="background:#e74c3c;color:#fff;border:none;
+                     padding:6px 14px;border-radius:6px;cursor:pointer;
+                     font-size:13px;">
+        提交
+      </button>
+    </div>
+  </div>
+
+  <!-- 答题卡抽屉（点击后展开，默认隐藏） -->
+  <div id="sheet-drawer"
+       style="display:none;
+              position:fixed;top:0;left:0;right:0;bottom:0;
+              z-index:200;background:rgba(0,0,0,0.45);"
+       onclick="closeSheetOnMask(event)">
+
+    <div style="position:absolute;right:0;top:0;bottom:0;width:280px;
+                max-width:85vw;background:#fff;
+                box-shadow:-4px 0 16px rgba(0,0,0,0.15);
+                display:flex;flex-direction:column;padding:16px;
+                overflow-y:auto;">
+
+      <!-- 抽屉头部 -->
+      <div style="display:flex;justify-content:space-between;
+                  align-items:center;margin-bottom:12px;">
+        <span style="font-size:15px;font-weight:bold;color:#333;">📋 答题卡</span>
+        <button onclick="toggleSheet()"
+                style="background:none;border:none;font-size:20px;
+                       cursor:pointer;color:#888;line-height:1;">×</button>
+      </div>
+
+      <!-- 图例 -->
+      <div style="font-size:11px;color:#888;margin-bottom:10px;display:flex;gap:10px;">
+        <span>
+          <span style="display:inline-block;width:12px;height:12px;
+                       background:#e0e0e0;border-radius:3px;
+                       vertical-align:middle;margin-right:3px;"></span>未答
+        </span>
+        <span>
+          <span style="display:inline-block;width:12px;height:12px;
+                       background:#3b82f6;border-radius:3px;
+                       vertical-align:middle;margin-right:3px;"></span>已答
+        </span>
+      </div>
+
+      <!-- 单选题格子 -->
+      <div style="font-size:12px;color:#3b82f6;font-weight:bold;
+                  margin-bottom:4px;">单选题</div>
+      <div id="sheet-single"
+           style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;">
+      </div>
+
+      <!-- 多选题格子 -->
+      <div style="font-size:12px;color:#f59e0b;font-weight:bold;
+                  margin-bottom:4px;">多选题</div>
+      <div id="sheet-multi"
+           style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;">
+      </div>
+
+      <!-- 判断题格子 -->
+      <div style="font-size:12px;color:#22c55e;font-weight:bold;
+                  margin-bottom:4px;">判断题</div>
+      <div id="sheet-judge"
+           style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;">
+      </div>
+
+      <button onclick="confirmSubmit()"
+              style="width:100%;padding:10px;background:#e74c3c;color:#fff;
+                     border:none;border-radius:8px;cursor:pointer;font-size:14px;">
+        提交试卷
+      </button>
+    </div>
   </div>
 
   <!-- 题目区域 -->
-  <div id="questions-area" style="padding-bottom:100px;"></div>
-
-  <!-- 答题卡（固定右侧） -->
-  <div id="answer-sheet"
-       style="position:fixed;right:15px;top:110px;
-              background:#fff;border:1px solid #ddd;border-radius:10px;
-              padding:12px;width:190px;
-              box-shadow:0 2px 10px rgba(0,0,0,0.1);
-              max-height:70vh;overflow-y:auto;">
-    <div style="font-size:13px;font-weight:bold;margin-bottom:8px;
-                color:#333;">答题卡</div>
-    <div style="font-size:11px;color:#888;margin-bottom:6px;">
-      <span style="display:inline-block;width:10px;height:10px;
-                   background:#e0e0e0;border-radius:2px;margin-right:3px;"></span>未答
-      <span style="display:inline-block;width:10px;height:10px;
-                   background:#3b82f6;border-radius:2px;margin:0 3px 0 8px;"></span>已答
-    </div>
-
-    <div style="font-size:11px;color:#3b82f6;font-weight:bold;
-                margin:6px 0 3px;">单选题</div>
-    <div id="sheet-single" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
-
-    <div style="font-size:11px;color:#f59e0b;font-weight:bold;
-                margin:8px 0 3px;">多选题</div>
-    <div id="sheet-multi" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
-
-    <div style="font-size:11px;color:#22c55e;font-weight:bold;
-                margin:8px 0 3px;">判断题</div>
-    <div id="sheet-judge" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
-
-    <button onclick="confirmSubmit()"
-            style="width:100%;margin-top:12px;background:#e74c3c;
-                   color:#fff;border:none;padding:8px;border-radius:6px;
-                   cursor:pointer;font-size:13px;">
-      提交
-    </button>
-  </div>
+  <div id="questions-area" style="padding:10px 0 100px;"></div>
 </div>
 
 <!-- 成绩页面 -->
 <div id="result-panel" style="display:none;"></div>
 
+<!-- ============================================================ -->
 <script>
+let examQuestions = [];
+let userAnswers   = {};
+let timerInterval = null;
+let totalSeconds  = 60 * 60;
+let examStartTime = null;
+let sheetOpen     = false;
+
 // ============================================================
-// 全局状态
+// 答题卡抽屉
 // ============================================================
-let examQuestions  = [];   // 所有题目
-let userAnswers    = {};   // { q_id: 'A' 或 'AB' }
-let timerInterval  = null;
-let totalSeconds   = 60 * 60;
-let examStartTime  = null;
+function toggleSheet() {
+  sheetOpen = !sheetOpen;
+  document.getElementById('sheet-drawer').style.display =
+    sheetOpen ? 'block' : 'none';
+}
+
+function closeSheetOnMask(e) {
+  // 点遮罩（非抽屉本身）关闭
+  if (e.target === document.getElementById('sheet-drawer')) {
+    sheetOpen = false;
+    document.getElementById('sheet-drawer').style.display = 'none';
+  }
+}
 
 // ============================================================
 // 开始考试
 // ============================================================
 async function startExam() {
-  document.getElementById('setup-panel').style.display  = 'none';
+  document.getElementById('setup-panel').style.display   = 'none';
   document.getElementById('loading-panel').style.display = 'block';
 
   try {
     const res  = await fetch('/api/exam/start', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body:    JSON.stringify({
         total:    120,
         duration: 60,
-        ratio: { '单选题': 40, '多选题': 40, '判断题': 40 }
+        ratio:    { '单选题': 40, '多选题': 40, '判断题': 40 }
       }),
     });
     const data = await res.json();
 
     if (data.error) {
       alert('抽题失败：' + data.error);
-      document.getElementById('setup-panel').style.display  = 'block';
+      document.getElementById('setup-panel').style.display   = 'block';
       document.getElementById('loading-panel').style.display = 'none';
       return;
     }
@@ -156,7 +217,7 @@ async function startExam() {
 
   } catch(e) {
     alert('网络错误，请重试');
-    document.getElementById('setup-panel').style.display  = 'block';
+    document.getElementById('setup-panel').style.display   = 'block';
     document.getElementById('loading-panel').style.display = 'none';
   }
 }
@@ -168,7 +229,6 @@ function renderQuestions() {
   const area = document.getElementById('questions-area');
   area.innerHTML = '';
 
-  // 按题型分组渲染
   const groups = [
     { type: '单选题', color: '#3b82f6', label: '一、单选题（共40题）' },
     { type: '多选题', color: '#f59e0b', label: '二、多选题（共40题）' },
@@ -178,85 +238,78 @@ function renderQuestions() {
   groups.forEach(group => {
     const qs = examQuestions.filter(q => q.type === group.type);
 
-    // 分组标题
     const title = document.createElement('div');
     title.style.cssText = `
-      padding: 12px 15px;
-      margin: 20px 0 10px;
+      padding: 10px 15px; margin: 18px 0 8px;
       background: ${group.color}18;
       border-left: 4px solid ${group.color};
-      font-weight: bold;
-      color: ${group.color};
-      border-radius: 0 6px 6px 0;
+      font-weight: bold; color: ${group.color};
+      border-radius: 0 6px 6px 0; font-size: 14px;
     `;
     title.textContent = group.label;
     area.appendChild(title);
 
-    qs.forEach((q, idx) => {
-      area.appendChild(createQuestionCard(q, idx + 1, group.color));
-    });
+    qs.forEach((q, idx) =>
+      area.appendChild(createQuestionCard(q, idx + 1))
+    );
   });
 }
 
-function createQuestionCard(q, indexInGroup, color) {
+function createQuestionCard(q, indexInGroup) {
   const card = document.createElement('div');
-  card.id = `qcard-${q.q_id}`;
+  card.id    = `qcard-${q.q_id}`;
   card.style.cssText = `
-    background: #fff;
-    border: 1px solid #e8e8e8;
-    border-radius: 8px;
-    padding: 18px;
-    margin: 10px 0;
+    background:#fff; border:1px solid #e8e8e8;
+    border-radius:8px; padding:16px; margin:8px 0;
   `;
 
-  // 题干
   const stem = document.createElement('p');
-  stem.style.cssText = 'font-size:15px;color:#333;margin-bottom:14px;line-height:1.6;';
-  stem.textContent   = `${indexInGroup}. ${q.stem}`;
+  stem.style.cssText =
+    'font-size:15px;color:#333;margin-bottom:12px;line-height:1.65;';
+  stem.textContent = `${indexInGroup}. ${q.stem}`;
   card.appendChild(stem);
 
-  // 选项
   const optWrap = document.createElement('div');
-
   q.options.forEach(opt => {
     const label = document.createElement('label');
     label.style.cssText = `
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 9px 12px;
-      margin: 5px 0;
-      border-radius: 6px;
-      cursor: pointer;
-      border: 1px solid #eee;
-      transition: background 0.15s;
-      font-size: 14px;
-      color: #444;
+      display:flex; align-items:flex-start; gap:8px;
+      padding:9px 12px; margin:4px 0;
+      border-radius:6px; cursor:pointer;
+      border:1px solid #eee;
+      font-size:14px; color:#444;
+      transition: background 0.12s, border-color 0.12s;
     `;
-    label.onmouseover = () => { label.style.background = '#f5f7ff'; };
-    label.onmouseout  = () => {
-      if (!label.classList.contains('selected')) {
-        label.style.background = '';
-      }
-    };
 
     const input = document.createElement('input');
     input.style.marginTop = '2px';
+    input.style.flexShrink = '0';
 
     if (q.type === '多选题') {
-      input.type  = 'checkbox';
-      input.name  = `ans_${q.q_id}`;
-      input.value = opt.key;
-      input.onchange = () => handleMultiChange(q.q_id, label);
+      input.type    = 'checkbox';
+      input.name    = `ans_${q.q_id}`;
+      input.value   = opt.key;
+      input.onchange = () => handleMultiChange(q.q_id);
     } else {
-      input.type  = 'radio';
-      input.name  = `ans_${q.q_id}`;
-      input.value = opt.key;
-      input.onchange = () => handleSingleChange(q.q_id, opt.key, label);
+      input.type    = 'radio';
+      input.name    = `ans_${q.q_id}`;
+      input.value   = opt.key;
+      input.onchange = () => handleSingleChange(q.q_id, opt.key);
     }
 
     label.appendChild(input);
     label.appendChild(document.createTextNode(`${opt.key}. ${opt.text}`));
+
+    // hover
+    label.onmouseover = () => {
+      if (!label.classList.contains('opted'))
+        label.style.background = '#f5f7ff';
+    };
+    label.onmouseout = () => {
+      if (!label.classList.contains('opted'))
+        label.style.background = '';
+    };
+
     optWrap.appendChild(label);
   });
 
@@ -265,25 +318,37 @@ function createQuestionCard(q, indexInGroup, color) {
 }
 
 // ============================================================
-// 答题处理
+// 答题处理 — 修复：选中高亮只给选中项，不误标红
 // ============================================================
-function handleSingleChange(q_id, key, clickedLabel) {
+function handleSingleChange(q_id, key) {
   userAnswers[q_id] = key;
 
-  // 更新选项样式
+  // 重置所有选项样式，再高亮选中项
   const card = document.getElementById(`qcard-${q_id}`);
   card.querySelectorAll('label').forEach(lb => {
-    lb.style.background = '';
-    lb.classList.remove('selected');
+    lb.classList.remove('opted');
+    lb.style.background   = '';
+    lb.style.borderColor  = '#eee';
+    lb.style.color        = '#444';
   });
-  clickedLabel.style.background = '#eff6ff';
-  clickedLabel.classList.add('selected');
+
+  // 找到被选中的 label 高亮（蓝色，不是红色）
+  const inputs = card.querySelectorAll(`input[name="ans_${q_id}"]`);
+  inputs.forEach(inp => {
+    if (inp.value === key) {
+      const lb = inp.closest('label');
+      lb.classList.add('opted');
+      lb.style.background  = '#eff6ff';
+      lb.style.borderColor = '#3b82f6';
+      lb.style.color       = '#1d4ed8';
+    }
+  });
 
   updateAnswerSheet(q_id);
   updateAnsweredCount();
 }
 
-function handleMultiChange(q_id, changedLabel) {
+function handleMultiChange(q_id) {
   const card    = document.getElementById(`qcard-${q_id}`);
   const checked = Array.from(
     card.querySelectorAll(`input[name="ans_${q_id}"]:checked`)
@@ -291,15 +356,19 @@ function handleMultiChange(q_id, changedLabel) {
 
   userAnswers[q_id] = checked.join('');
 
-  // 更新选项样式
+  // 重置所有，再高亮已勾选的（橙色系）
   card.querySelectorAll('label').forEach(lb => {
     const inp = lb.querySelector('input');
     if (inp && inp.checked) {
-      lb.style.background = '#fffbeb';
-      lb.classList.add('selected');
+      lb.classList.add('opted');
+      lb.style.background  = '#fffbeb';
+      lb.style.borderColor = '#f59e0b';
+      lb.style.color       = '#92400e';
     } else {
-      lb.style.background = '';
-      lb.classList.remove('selected');
+      lb.classList.remove('opted');
+      lb.style.background  = '';
+      lb.style.borderColor = '#eee';
+      lb.style.color       = '#444';
     }
   });
 
@@ -308,7 +377,7 @@ function handleMultiChange(q_id, changedLabel) {
 }
 
 // ============================================================
-// 答题卡
+// 答题卡格子
 // ============================================================
 function buildAnswerSheet() {
   const singles = examQuestions.filter(q => q.type === '单选题');
@@ -326,19 +395,21 @@ function buildSheetGroup(containerId, qs, color) {
     const dot = document.createElement('div');
     dot.id    = `dot-${q.q_id}`;
     dot.style.cssText = `
-      width: 24px; height: 24px;
-      border-radius: 4px;
-      background: #e0e0e0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 10px; cursor: pointer; color: #666;
+      width:28px; height:28px; border-radius:4px;
+      background:#e0e0e0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px; cursor:pointer; color:#666;
+      transition: background 0.15s;
     `;
-    dot.textContent = idx + 1;
-    dot.title       = `点击跳转`;
-    dot.onclick     = () => {
+    dot.textContent   = idx + 1;
+    dot.dataset.color = color;
+    dot.onclick = () => {
+      // 关闭抽屉再跳转
+      sheetOpen = false;
+      document.getElementById('sheet-drawer').style.display = 'none';
       document.getElementById(`qcard-${q.q_id}`)
         .scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
-    dot.dataset.color = color;
     container.appendChild(dot);
   });
 }
@@ -346,9 +417,9 @@ function buildSheetGroup(containerId, qs, color) {
 function updateAnswerSheet(q_id) {
   const dot = document.getElementById(`dot-${q_id}`);
   if (!dot) return;
-  const answered = userAnswers[q_id] && userAnswers[q_id].length > 0;
-  dot.style.background = answered ? dot.dataset.color : '#e0e0e0';
-  dot.style.color      = answered ? '#fff' : '#666';
+  const done = userAnswers[q_id] && userAnswers[q_id].length > 0;
+  dot.style.background = done ? dot.dataset.color : '#e0e0e0';
+  dot.style.color      = done ? '#fff' : '#666';
 }
 
 function updateAnsweredCount() {
@@ -372,9 +443,9 @@ function startTimer() {
     }
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
-    display.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    display.textContent =
+      `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 
-    // 最后5分钟变红闪烁
     if (totalSeconds <= 300) {
       document.getElementById('timer-box').style.color = '#e74c3c';
     }
@@ -385,21 +456,19 @@ function startTimer() {
 // 提交
 // ============================================================
 function confirmSubmit() {
-  const answeredCount = Object.values(userAnswers)
+  const answered  = Object.values(userAnswers)
     .filter(v => v && v.length > 0).length;
-  const unanswered = 120 - answeredCount;
-
-  let msg = '确认提交试卷？';
-  if (unanswered > 0) {
-    msg = `还有 ${unanswered} 题未作答，确认提交？`;
-  }
+  const unanswered = 120 - answered;
+  const msg = unanswered > 0
+    ? `还有 ${unanswered} 题未作答，确认提交？`
+    : '确认提交试卷？';
   if (confirm(msg)) submitExam();
 }
 
 async function submitExam() {
   clearInterval(timerInterval);
 
-  document.getElementById('exam-panel').style.display = 'none';
+  document.getElementById('exam-panel').style.display   = 'none';
   document.getElementById('result-panel').style.display = 'block';
   document.getElementById('result-panel').innerHTML = `
     <div style="text-align:center;padding:60px;">
@@ -411,12 +480,9 @@ async function submitExam() {
 
   try {
     const res  = await fetch('/api/exam/submit', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        answers:  userAnswers,
-        duration: usedSeconds,
-      }),
+      body:    JSON.stringify({ answers: userAnswers, duration: usedSeconds }),
     });
     const data = await res.json();
     renderResult(data);
@@ -442,19 +508,17 @@ async function submitExam() {
 }
 
 // ============================================================
-// 渲染成绩页面
+// 成绩页
 // ============================================================
 function renderResult(data) {
-  const mins = Math.floor(data.duration / 60);
-  const secs = data.duration % 60;
+  const mins    = Math.floor(data.duration / 60);
+  const secs    = data.duration % 60;
   const timeStr = `${mins}分${secs}秒`;
 
   // 按题型统计
   const typeStats = {};
   data.details.forEach(d => {
-    if (!typeStats[d.type]) {
-      typeStats[d.type] = { total: 0, correct: 0 };
-    }
+    if (!typeStats[d.type]) typeStats[d.type] = { total: 0, correct: 0 };
     typeStats[d.type].total++;
     if (d.is_correct) typeStats[d.type].correct++;
   });
@@ -467,31 +531,30 @@ function renderResult(data) {
 
   let typeHtml = '';
   ['单选题','多选题','判断题'].forEach(t => {
-    const s = typeStats[t] || { total: 0, correct: 0 };
+    const s    = typeStats[t] || { total: 0, correct: 0 };
     const rate = s.total ? Math.round(s.correct / s.total * 100) : 0;
-    const color = rate >= 60 ? '#22c55e' : '#e74c3c';
-    typeHtml += `
+    const c    = rate >= 60 ? '#22c55e' : '#e74c3c';
+    typeHtml  += `
       <div style="flex:1;text-align:center;padding:12px;
                   background:#f8f9fa;border-radius:8px;">
-        <div style="font-size:20px;font-weight:bold;color:${color};">
+        <div style="font-size:20px;font-weight:bold;color:${c};">
           ${s.correct}/${s.total}
         </div>
-        <div style="font-size:12px;color:#888;margin-top:4px;">${t}</div>
-        <div style="font-size:11px;color:${color};">正确率${rate}%</div>
+        <div style="font-size:12px;color:#888;margin-top:3px;">${t}</div>
+        <div style="font-size:11px;color:${c};">正确率${rate}%</div>
       </div>`;
   });
 
   // 错题列表
-  const wrongDetails = data.details.filter(d => !d.is_correct);
+  const wrongs = data.details.filter(d => !d.is_correct);
   let wrongHtml = '';
-  wrongDetails.forEach((d, i) => {
+  wrongs.forEach((d, i) => {
     let optHtml = '';
     (d.options || []).forEach(opt => {
       const isCorrect  = d.correct_answer.includes(opt.key);
-      const isSelected = d.user_answer.includes(opt.key);
-      let bg = '';
-      let suffix = '';
-      if (isCorrect)       { bg = 'background:#e8f8e8;color:#27ae60;'; suffix = ' ✅'; }
+      const isSelected = (d.user_answer || '').includes(opt.key);
+      let bg = ''; let suffix = '';
+      if      (isCorrect)  { bg = 'background:#e8f8e8;color:#27ae60;'; suffix = ' ✅'; }
       else if (isSelected) { bg = 'background:#ffeaea;color:#e74c3c;'; suffix = ' ❌'; }
       optHtml += `
         <div style="padding:5px 10px;margin:3px 0;border-radius:4px;
@@ -500,15 +563,11 @@ function renderResult(data) {
         </div>`;
     });
 
-    let expHtml = '';
-    if (d.explanation) {
-      expHtml = `
-        <div style="background:#fff8e1;padding:8px 12px;border-radius:5px;
-                    margin-top:8px;font-size:13px;color:#666;">
-          <span style="color:#f39c12;font-weight:bold;">💡 解析：</span>
-          ${d.explanation}
-        </div>`;
-    }
+    const expHtml = d.explanation ? `
+      <div style="background:#fff8e1;padding:8px 12px;border-radius:5px;
+                  margin-top:8px;font-size:13px;color:#666;">
+        <span style="color:#f39c12;font-weight:bold;">💡 解析：</span>${d.explanation}
+      </div>` : '';
 
     wrongHtml += `
       <div style="background:#fff;border:1px solid #ffe0e0;border-radius:8px;
@@ -520,10 +579,10 @@ function renderResult(data) {
         <p style="font-size:14px;color:#333;margin-bottom:10px;">${d.stem}</p>
         ${optHtml}
         <div style="margin-top:8px;font-size:13px;">
-          <span style="color:#27ae60;">✅ 正确答案：${d.correct_answer}</span>
+          <span style="color:#27ae60;">✅ 正确：${d.correct_answer}</span>
           &nbsp;&nbsp;
           <span style="color:#e74c3c;">
-            ❌ 你的答案：${d.user_answer || '未作答'}
+            ❌ 你的：${d.user_answer || '未作答'}
           </span>
         </div>
         ${expHtml}
@@ -531,22 +590,17 @@ function renderResult(data) {
   });
 
   document.getElementById('result-panel').innerHTML = `
-    <!-- 成绩总览 -->
-    <div style="text-align:center;padding:30px 20px 20px;">
-      <div style="font-size:60px;font-weight:bold;color:${scoreColor};
+    <div style="text-align:center;padding:30px 20px 16px;">
+      <div style="font-size:64px;font-weight:bold;color:${scoreColor};
                   line-height:1;">${data.score}</div>
-      <div style="font-size:18px;color:#666;margin:8px 0;">${scoreTip}</div>
+      <div style="font-size:18px;color:#555;margin:8px 0;">${scoreTip}</div>
       <div style="font-size:13px;color:#aaa;">
-        答对 ${data.correct} / ${data.total} 题 · 用时 ${timeStr}
+        答对 ${data.correct}/${data.total} 题 · 用时 ${timeStr}
       </div>
     </div>
 
-    <!-- 分题型统计 -->
-    <div style="display:flex;gap:10px;padding:0 15px 20px;">
-      ${typeHtml}
-    </div>
+    <div style="display:flex;gap:10px;padding:0 15px 16px;">${typeHtml}</div>
 
-    <!-- 操作按钮 -->
     <div style="display:flex;gap:10px;padding:0 15px 20px;">
       <button onclick="location.reload()"
               style="flex:1;padding:12px;background:#3b82f6;color:#fff;
@@ -560,11 +614,10 @@ function renderResult(data) {
       </button>
     </div>
 
-    <!-- 错题详情 -->
-    ${wrongDetails.length > 0 ? `
-    <div style="padding:0 15px;">
+    ${wrongs.length > 0 ? `
+    <div style="padding:0 15px 40px;">
       <h3 style="color:#e74c3c;margin-bottom:10px;">
-        ❌ 错题详情（${wrongDetails.length}题）
+        ❌ 错题详情（${wrongs.length}题）
       </h3>
       ${wrongHtml}
     </div>` : `
