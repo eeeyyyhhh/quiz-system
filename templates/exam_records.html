@@ -8,99 +8,148 @@
   <div style="display:flex;justify-content:space-between;align-items:center;
               margin-bottom:20px;">
     <h2 style="margin:0;color:#333;">📊 考试记录</h2>
-    <a href="/exam"
-       style="background:#3b82f6;color:#fff;padding:8px 16px;
-              border-radius:8px;text-decoration:none;font-size:14px;">
-      ➕ 新考试
-    </a>
+    <div style="display:flex;gap:8px;">
+      <button onclick="clearAllRecords()"
+              style="background:#fff;color:#e74c3c;border:1px solid #fca5a5;
+                     padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px;">
+        🗑️ 清空
+      </button>
+      <a href="/exam"
+         style="background:#3b82f6;color:#fff;padding:8px 16px;
+                border-radius:8px;text-decoration:none;font-size:14px;">
+        ➕ 新考试
+      </a>
+    </div>
   </div>
 
-  <!-- 统计汇总卡片 -->
-  <div id="summary-cards"
-       style="display:grid;grid-template-columns:repeat(4,1fr);
+  <!-- 统计汇总 -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);
               gap:10px;margin-bottom:20px;">
-    <div class="sum-card" style="background:#eff6ff;border-radius:10px;
-                                  padding:14px;text-align:center;">
-      <div id="sum-count" style="font-size:26px;font-weight:bold;color:#3b82f6;">-</div>
+    <div style="background:#eff6ff;border-radius:10px;padding:14px;text-align:center;">
+      <div id="sum-count"
+           style="font-size:26px;font-weight:bold;color:#3b82f6;">0</div>
       <div style="font-size:12px;color:#888;margin-top:3px;">考试次数</div>
     </div>
-    <div class="sum-card" style="background:#f0fdf4;border-radius:10px;
-                                  padding:14px;text-align:center;">
-      <div id="sum-avg" style="font-size:26px;font-weight:bold;color:#22c55e;">-</div>
+    <div style="background:#f0fdf4;border-radius:10px;padding:14px;text-align:center;">
+      <div id="sum-avg"
+           style="font-size:26px;font-weight:bold;color:#22c55e;">-</div>
       <div style="font-size:12px;color:#888;margin-top:3px;">平均分</div>
     </div>
-    <div class="sum-card" style="background:#fefce8;border-radius:10px;
-                                  padding:14px;text-align:center;">
-      <div id="sum-best" style="font-size:26px;font-weight:bold;color:#f59e0b;">-</div>
+    <div style="background:#fefce8;border-radius:10px;padding:14px;text-align:center;">
+      <div id="sum-best"
+           style="font-size:26px;font-weight:bold;color:#f59e0b;">-</div>
       <div style="font-size:12px;color:#888;margin-top:3px;">最高分</div>
     </div>
-    <div class="sum-card" style="background:#fdf2f8;border-radius:10px;
-                                  padding:14px;text-align:center;">
-      <div id="sum-pass" style="font-size:26px;font-weight:bold;color:#a855f7;">-%</div>
+    <div style="background:#fdf2f8;border-radius:10px;padding:14px;text-align:center;">
+      <div id="sum-pass"
+           style="font-size:26px;font-weight:bold;color:#a855f7;">-%</div>
       <div style="font-size:12px;color:#888;margin-top:3px;">及格率</div>
     </div>
   </div>
 
-  <!-- 趋势折线图 -->
+  <!-- 趋势图 -->
   <div style="background:#fff;border:1px solid #eee;border-radius:10px;
               padding:16px;margin-bottom:20px;">
     <div style="font-size:14px;font-weight:bold;color:#333;margin-bottom:12px;">
-      📈 成绩趋势
+      📈 成绩趋势（从旧到新）
     </div>
-    <canvas id="trend-chart" height="120"></canvas>
+    <canvas id="trend-chart" height="120"
+            style="width:100%;display:block;"></canvas>
+    <div id="trend-empty"
+         style="display:none;text-align:center;color:#ccc;
+                padding:20px;font-size:13px;">
+      至少考2次才能显示趋势图
+    </div>
   </div>
 
   <!-- 记录列表 -->
   <div id="records-list"></div>
 
-  <!-- 加载中 -->
-  <div id="loading-tip"
-       style="text-align:center;padding:40px;color:#aaa;font-size:14px;">
-    加载中...
+  <div id="empty-tip"
+       style="display:none;text-align:center;padding:60px;color:#ccc;">
+    <div style="font-size:48px;margin-bottom:12px;">📝</div>
+    <div>还没有考试记录，快去考一次吧！</div>
+    <a href="/exam"
+       style="display:inline-block;margin-top:16px;padding:10px 24px;
+              background:#3b82f6;color:#fff;border-radius:8px;
+              text-decoration:none;font-size:14px;">
+      开始考试
+    </a>
   </div>
 </div>
 
 <!-- 详情弹窗 -->
 <div id="detail-modal"
      style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;
-            background:rgba(0,0,0,0.5);z-index:500;overflow-y:auto;">
-  <div style="background:#fff;max-width:700px;margin:30px auto;
+            background:rgba(0,0,0,0.5);z-index:500;overflow-y:auto;
+            -webkit-overflow-scrolling:touch;">
+  <div style="background:#fff;max-width:700px;margin:20px auto 40px;
               border-radius:12px;padding:20px;position:relative;">
     <button onclick="closeDetail()"
             style="position:absolute;top:12px;right:14px;background:none;
-                   border:none;font-size:22px;cursor:pointer;color:#888;">×</button>
+                   border:none;font-size:24px;cursor:pointer;color:#888;
+                   line-height:1;">×</button>
     <div id="detail-content"></div>
   </div>
 </div>
 
 <script>
-let allRecords = [];
+// ================================================================
+// 本地记录读取
+// ================================================================
+const KEY_RECORDS = 'exam_records_local';
 
-// ============================================================
-// 加载记录
-// ============================================================
-async function loadRecords() {
+function getLocalRecords() {
   try {
-    const res  = await fetch('/api/exam/records');
-    allRecords = await res.json();
-    document.getElementById('loading-tip').style.display = 'none';
-    renderSummary(allRecords);
-    renderTrend(allRecords);
-    renderList(allRecords);
-  } catch(e) {
-    document.getElementById('loading-tip').textContent = '加载失败，请刷新重试';
-  }
+    return JSON.parse(localStorage.getItem(KEY_RECORDS) || '[]');
+  } catch(e) { return []; }
 }
 
-// ============================================================
-// 汇总统计
-// ============================================================
+function clearAllRecords() {
+  if (!confirm('确定清空全部考试记录？此操作不可恢复。')) return;
+  localStorage.removeItem(KEY_RECORDS);
+  init();
+}
+
+// ================================================================
+// 初始化
+// ================================================================
+function init() {
+  const records = getLocalRecords();
+
+  if (!records.length) {
+    document.getElementById('empty-tip').style.display    = 'block';
+    document.getElementById('trend-empty').style.display  = 'block';
+    document.getElementById('trend-chart').style.display  = 'none';
+    renderSummary([]);
+    document.getElementById('records-list').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('empty-tip').style.display   = 'none';
+  document.getElementById('trend-chart').style.display = 'block';
+  document.getElementById('trend-empty').style.display = 'none';
+
+  renderSummary(records);
+  renderTrend(records);
+  renderList(records);
+}
+
+// ================================================================
+// 汇总
+// ================================================================
 function renderSummary(records) {
-  if (!records.length) return;
-  const count  = records.length;
-  const avg    = (records.reduce((s, r) => s + r.score, 0) / count).toFixed(1);
-  const best   = Math.max(...records.map(r => r.score));
-  const passed = records.filter(r => r.score >= 60).length;
+  if (!records.length) {
+    document.getElementById('sum-count').textContent = 0;
+    document.getElementById('sum-avg').textContent   = '-';
+    document.getElementById('sum-best').textContent  = '-';
+    document.getElementById('sum-pass').textContent  = '-%';
+    return;
+  }
+  const count    = records.length;
+  const avg      = (records.reduce((s, r) => s + r.score, 0) / count).toFixed(1);
+  const best     = Math.max(...records.map(r => r.score));
+  const passed   = records.filter(r => r.score >= 60).length;
   const passRate = Math.round(passed / count * 100);
 
   document.getElementById('sum-count').textContent = count;
@@ -109,74 +158,99 @@ function renderSummary(records) {
   document.getElementById('sum-pass').textContent  = passRate + '%';
 }
 
-// ============================================================
-// 趋势图（纯Canvas，不依赖第三方库）
-// ============================================================
+// ================================================================
+// 趋势图（纯Canvas）
+// ================================================================
 function renderTrend(records) {
-  if (records.length < 2) return;
+  if (records.length < 2) {
+    document.getElementById('trend-chart').style.display = 'none';
+    document.getElementById('trend-empty').style.display = 'block';
+    return;
+  }
 
-  // 从旧到新排序
+  // 从旧到新
   const sorted = [...records].reverse();
   const scores = sorted.map(r => r.score);
-  const labels = sorted.map(r => r.created_at.slice(5, 10));
+  const labels = sorted.map((r, i) => `第${i+1}次`);
 
-  const canvas = document.getElementById('trend-chart');
-  const ctx    = canvas.getContext('2d');
-  const W      = canvas.offsetWidth || 700;
-  const H      = 120;
+  const canvas  = document.getElementById('trend-chart');
+  const W       = canvas.parentElement.clientWidth - 32 || 600;
+  const H       = 120;
   canvas.width  = W;
   canvas.height = H;
+  const ctx     = canvas.getContext('2d');
 
-  const pad   = { top: 10, right: 20, bottom: 24, left: 36 };
+  const pad    = {top: 14, right: 20, bottom: 26, left: 36};
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top - pad.bottom;
 
-  const minScore = Math.max(0,  Math.min(...scores) - 10);
-  const maxScore = Math.min(100, Math.max(...scores) + 10);
-  const scaleY   = v => pad.top + chartH - ((v - minScore) / (maxScore - minScore)) * chartH;
-  const scaleX   = i => pad.left + (i / (scores.length - 1)) * chartW;
+  const minS  = Math.max(0,   Math.min(...scores) - 10);
+  const maxS  = Math.min(100, Math.max(...scores) + 10);
+  const sy    = v  => pad.top + chartH - ((v - minS) / (maxS - minS)) * chartH;
+  const sx    = i  => scores.length === 1
+                       ? pad.left + chartW / 2
+                       : pad.left + (i / (scores.length - 1)) * chartW;
 
   ctx.clearRect(0, 0, W, H);
 
   // 及格线
-  const passY = scaleY(60);
-  ctx.setLineDash([4, 4]);
-  ctx.strokeStyle = '#fca5a5';
-  ctx.lineWidth   = 1;
+  if (60 >= minS && 60 <= maxS) {
+    const py = sy(60);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#fca5a5';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, py);
+    ctx.lineTo(pad.left + chartW, py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle  = '#fca5a5';
+    ctx.font       = '10px sans-serif';
+    ctx.textAlign  = 'left';
+    ctx.fillText('60分', 2, py + 4);
+  }
+
+  // 渐变填充
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+  grad.addColorStop(0, 'rgba(59,130,246,0.18)');
+  grad.addColorStop(1, 'rgba(59,130,246,0)');
   ctx.beginPath();
-  ctx.moveTo(pad.left, passY);
-  ctx.lineTo(pad.left + chartW, passY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#fca5a5';
-  ctx.font      = '10px sans-serif';
-  ctx.fillText('60', 2, passY + 4);
+  scores.forEach((s, i) => {
+    const x = sx(i), y = sy(s);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(sx(scores.length - 1), pad.top + chartH);
+  ctx.lineTo(sx(0), pad.top + chartH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
 
   // 折线
   ctx.strokeStyle = '#3b82f6';
-  ctx.lineWidth   = 2;
+  ctx.lineWidth   = 2.5;
+  ctx.lineJoin    = 'round';
   ctx.beginPath();
   scores.forEach((s, i) => {
-    const x = scaleX(i), y = scaleY(s);
+    const x = sx(i), y = sy(s);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
 
-  // 数据点 + 分值
+  // 点 + 分数标签
   scores.forEach((s, i) => {
-    const x = scaleX(i), y = scaleY(s);
+    const x = sx(i), y = sy(s);
     ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
     ctx.fillStyle   = s >= 60 ? '#22c55e' : '#e74c3c';
     ctx.fill();
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth   = 1.5;
+    ctx.lineWidth   = 2;
     ctx.stroke();
 
-    ctx.fillStyle = '#555';
-    ctx.font      = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(s, x, y - 8);
+    ctx.fillStyle  = '#444';
+    ctx.font       = 'bold 11px sans-serif';
+    ctx.textAlign  = 'center';
+    ctx.fillText(s, x, y - 9);
   });
 
   // X轴标签
@@ -184,49 +258,42 @@ function renderTrend(records) {
   ctx.font      = '10px sans-serif';
   ctx.textAlign = 'center';
   labels.forEach((lb, i) => {
-    ctx.fillText(lb, scaleX(i), H - 4);
+    ctx.fillText(lb, sx(i), H - 5);
   });
 }
 
-// ============================================================
+// ================================================================
 // 记录列表
-// ============================================================
+// ================================================================
 function renderList(records) {
   const container = document.getElementById('records-list');
-  if (!records.length) {
-    container.innerHTML = `
-      <div style="text-align:center;padding:40px;color:#aaa;">
-        还没有考试记录，快去考一次吧 🚀
-      </div>`;
-    return;
-  }
-
   container.innerHTML = records.map((r, idx) => {
     const scoreColor = r.score >= 60 ? '#22c55e' : '#e74c3c';
     const scoreBg    = r.score >= 60 ? '#f0fdf4' : '#fef2f2';
     const mins       = Math.floor((r.duration || 0) / 60);
     const secs       = (r.duration || 0) % 60;
     const timeStr    = mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
-    const dateStr    = (r.created_at || '').slice(0, 16).replace('T', ' ');
-    const rank       = records.length - idx;   // 第几次（从第1次开始）
+    const num        = records.length - idx;   // 第几次考试
 
     return `
       <div style="background:#fff;border:1px solid #eee;border-radius:10px;
-                  padding:15px;margin-bottom:12px;
-                  display:flex;align-items:center;gap:12px;">
+                  padding:14px;margin-bottom:10px;
+                  display:flex;align-items:center;gap:10px;">
 
         <!-- 序号 -->
-        <div style="width:32px;height:32px;border-radius:50%;
+        <div style="width:34px;height:34px;border-radius:50%;
                     background:#f3f4f6;display:flex;align-items:center;
                     justify-content:center;font-size:13px;
-                    color:#888;flex-shrink:0;">
-          ${rank}
+                    color:#888;flex-shrink:0;font-weight:bold;">
+          ${num}
         </div>
 
         <!-- 主信息 -->
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;color:#333;font-weight:bold;margin-bottom:3px;">
-            ${r.subject || '综合'} · ${dateStr}
+          <div style="font-size:13px;color:#333;font-weight:bold;
+                      margin-bottom:3px;white-space:nowrap;
+                      overflow:hidden;text-overflow:ellipsis;">
+            ${r.created_at || ''}
           </div>
           <div style="font-size:12px;color:#aaa;">
             答对 ${r.correct}/${r.total} 题 · 用时 ${timeStr}
@@ -235,60 +302,53 @@ function renderList(records) {
 
         <!-- 分数 -->
         <div style="background:${scoreBg};border-radius:8px;
-                    padding:8px 14px;text-align:center;flex-shrink:0;">
-          <div style="font-size:22px;font-weight:bold;color:${scoreColor};
-                      line-height:1;">${r.score}</div>
-          <div style="font-size:11px;color:#aaa;margin-top:2px;">分</div>
+                    padding:8px 12px;text-align:center;flex-shrink:0;">
+          <div style="font-size:22px;font-weight:bold;
+                      color:${scoreColor};line-height:1;">${r.score}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:1px;">分</div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <!-- 操作 -->
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
           <button onclick="showDetail(${r.id})"
-                  style="padding:6px 12px;background:#eff6ff;color:#3b82f6;
+                  style="padding:5px 10px;background:#eff6ff;color:#3b82f6;
                          border:1px solid #bfdbfe;border-radius:6px;
                          cursor:pointer;font-size:12px;white-space:nowrap;">
             📋 详情
           </button>
           <button onclick="retryWrong(${r.id})"
-                  style="padding:6px 12px;background:#fff7ed;color:#f59e0b;
+                  style="padding:5px 10px;background:#fff7ed;color:#f59e0b;
                          border:1px solid #fed7aa;border-radius:6px;
                          cursor:pointer;font-size:12px;white-space:nowrap;">
-            🔁 重做错题
+            🔁 重做
           </button>
         </div>
       </div>`;
   }).join('');
 }
 
-// ============================================================
-// 查看详情弹窗
-// ============================================================
-async function showDetail(recordId) {
-  document.getElementById('detail-content').innerHTML = `
-    <div style="text-align:center;padding:40px;color:#aaa;">加载中...</div>`;
-  document.getElementById('detail-modal').style.display = 'block';
+// ================================================================
+// 详情弹窗
+// ================================================================
+function showDetail(recordId) {
+  const records = getLocalRecords();
+  const r       = records.find(r => r.id === recordId);
+  if (!r) { alert('记录不存在'); return; }
 
-  try {
-    const res  = await fetch(`/api/exam/record/${recordId}`);
-    const data = await res.json();
-    renderDetail(data);
-  } catch(e) {
-    document.getElementById('detail-content').innerHTML =
-      '<div style="color:#e74c3c;padding:20px;">加载失败</div>';
-  }
+  document.getElementById('detail-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  renderDetail(r);
 }
 
-function renderDetail(data) {
-  const details  = data.details || [];
+function renderDetail(r) {
+  const details  = r.details || [];
   const wrongs   = details.filter(d => !d.is_correct);
-  const corrects = details.filter(d => d.is_correct);
-  const mins     = Math.floor((data.duration || 0) / 60);
-  const secs     = (data.duration || 0) % 60;
-  const dateStr  = (data.created_at || '').slice(0, 16);
+  const mins     = Math.floor((r.duration || 0) / 60);
+  const secs     = (r.duration || 0) % 60;
+  const scoreMap = {'单选题': 1, '多选题': 1, '判断题': 0.5};
 
   // 各题型统计
   const typeStats = {};
-  const scoreMap  = {'单选题': 1, '多选题': 1, '判断题': 0.5};
   details.forEach(d => {
     if (!typeStats[d.type]) typeStats[d.type] = {total: 0, correct: 0, score: 0};
     typeStats[d.type].total++;
@@ -298,25 +358,24 @@ function renderDetail(data) {
     }
   });
 
-  let typeHtml = ['单选题','多选题','判断题'].map(t => {
+  const typeHtml = ['单选题','多选题','判断题'].map(t => {
     const s    = typeStats[t] || {total: 0, correct: 0, score: 0};
     const rate = s.total ? Math.round(s.correct / s.total * 100) : 0;
+    const maxS = t === '判断题' ? 20 : 40;
     const c    = rate >= 60 ? '#22c55e' : '#e74c3c';
     return `
       <div style="flex:1;text-align:center;background:#f8f9fa;
                   border-radius:8px;padding:10px;">
-        <div style="font-size:18px;font-weight:bold;color:${c};">
-          ${s.score}
-        </div>
+        <div style="font-size:18px;font-weight:bold;color:${c};">${s.score}</div>
+        <div style="font-size:10px;color:#aaa;">/${maxS}分</div>
         <div style="font-size:11px;color:#888;">${t}</div>
         <div style="font-size:11px;color:${c};">${s.correct}/${s.total}</div>
       </div>`;
   }).join('');
 
-  // 错题列表
   let wrongHtml = '';
   wrongs.forEach((d, i) => {
-    let optHtml = (d.options || []).map(opt => {
+    const optHtml = (d.options || []).map(opt => {
       const isCorrect  = d.correct_answer.includes(opt.key);
       const isSelected = (d.user_answer || '').includes(opt.key);
       let bg = '';
@@ -339,100 +398,168 @@ function renderDetail(data) {
       <div style="border:1px solid #ffe0e0;border-radius:8px;
                   padding:12px;margin:8px 0;border-left:4px solid #e74c3c;">
         <div style="font-size:12px;color:#aaa;margin-bottom:6px;">
-          ${d.type} · 错题${i+1}
+          ${d.type} · 错题${i + 1}
         </div>
-        <p style="font-size:14px;color:#333;margin-bottom:8px;">${d.stem}</p>
+        <p style="font-size:14px;color:#333;margin-bottom:8px;
+                  line-height:1.6;">${d.stem}</p>
         ${optHtml}
+        <div style="margin-top:6px;font-size:12px;">
+          <span style="color:#27ae60;">✅ 正确：${d.correct_answer}</span>
+          &nbsp;
+          <span style="color:#e74c3c;">❌ 你的：${d.user_answer || '未作答'}</span>
+        </div>
         ${expHtml}
       </div>`;
   });
 
   document.getElementById('detail-content').innerHTML = `
-    <h3 style="margin:0 0 4px;color:#333;">
-      📋 ${data.subject || '综合'} 考试详情
+    <h3 style="margin:0 0 4px;color:#333;padding-right:30px;">
+      📋 考试详情
     </h3>
-    <p style="color:#aaa;font-size:13px;margin-bottom:16px;">${dateStr}</p>
+    <p style="color:#aaa;font-size:13px;margin-bottom:16px;">${r.created_at || ''}</p>
 
-    <!-- 总分 -->
     <div style="text-align:center;margin-bottom:16px;">
-      <div style="font-size:56px;font-weight:bold;
-                  color:${data.score >= 60 ? '#22c55e' : '#e74c3c'};">
-        ${data.score}
+      <div style="font-size:56px;font-weight:bold;line-height:1;
+                  color:${r.score >= 60 ? '#22c55e' : '#e74c3c'};">
+        ${r.score}
       </div>
-      <div style="color:#aaa;font-size:13px;">
-        答对 ${data.correct}/${data.total} · 用时 ${mins}分${secs}秒
+      <div style="color:#aaa;font-size:13px;margin-top:4px;">
+        答对 ${r.correct}/${r.total} · 用时 ${mins}分${secs}秒
       </div>
     </div>
 
-    <!-- 各题型得分 -->
-    <div style="display:flex;gap:10px;margin-bottom:20px;">${typeHtml}</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;">${typeHtml}</div>
 
-    <!-- 重做按钮 -->
     ${wrongs.length > 0 ? `
-    <button onclick="retryWrong(${data.id})"
-            style="width:100%;padding:10px;background:#f59e0b;color:#fff;
+    <button onclick="retryWrong(${r.id})"
+            style="width:100%;padding:11px;background:#f59e0b;color:#fff;
                    border:none;border-radius:8px;cursor:pointer;
                    font-size:14px;margin-bottom:16px;">
       🔁 重做本次错题（${wrongs.length}题）
     </button>` : `
-    <div style="text-align:center;color:#22c55e;padding:10px;
-                margin-bottom:16px;font-size:14px;">
+    <div style="text-align:center;color:#22c55e;padding:10px 0 16px;font-size:14px;">
       🎉 本次全部答对！
     </div>`}
 
-    <!-- 错题详情 -->
     ${wrongs.length > 0 ? `
-    <div>
-      <h4 style="color:#e74c3c;margin-bottom:10px;">
-        ❌ 错题列表（${wrongs.length}题）
-      </h4>
-      ${wrongHtml}
-    </div>` : ''}
+    <h4 style="color:#e74c3c;margin:0 0 10px;">
+      ❌ 错题列表（${wrongs.length}题）
+    </h4>
+    ${wrongHtml}` : ''}
   `;
 }
 
 function closeDetail() {
   document.getElementById('detail-modal').style.display = 'none';
+  document.body.style.overflow = '';
 }
 
-// 点遮罩关闭
 document.getElementById('detail-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDetail();
 });
 
-// ============================================================
-// 重做错题 → 跳转考试页并携带参数
-// ============================================================
+// ================================================================
+// 重做错题
+// ================================================================
 async function retryWrong(recordId) {
-  // 关闭弹窗
   closeDetail();
 
-  // 调接口获取错题，存入 sessionStorage 后跳转
+  const records = getLocalRecords();
+  const r       = records.find(r => r.id === recordId);
+  if (!r) { alert('记录不存在'); return; }
+
+  const wrongIds = (r.details || [])
+    .filter(d => !d.is_correct)
+    .map(d => d.q_id);
+
+  if (!wrongIds.length) {
+    alert('本次考试没有错题 🎉');
+    return;
+  }
+
   try {
     const res  = await fetch(`/api/exam/record/${recordId}/retry`, {
-      method: 'POST',
+      method:  'POST',
       headers: {'Content-Type': 'application/json'},
     });
     const data = await res.json();
 
     if (data.error) {
-      alert(data.error);
+      // 服务器找不到记录ID（因为记录已改为本地存储），
+      // 改用前端直接传题目ID列表的方式
+      await retryByIds(wrongIds);
       return;
     }
 
-    // 存入 sessionStorage，exam.html 检测后直接加载
     sessionStorage.setItem('retry_exam_data', JSON.stringify(data));
     window.location.href = '/exam?mode=retry';
 
   } catch(e) {
-    alert('网络错误，请重试');
+    await retryByIds(wrongIds);
   }
 }
 
-// ============================================================
+async function retryByIds(q_ids) {
+  try {
+    const res  = await fetch('/api/practice/start_by_ids', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({q_ids}),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+
+    // 构造与重做模式兼容的数据格式
+    // 需要获取完整题目列表
+    const fullRes = await fetch('/api/exam/start', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        duration:    60,
+        ratio:       {},
+        exclude_ids: [],
+        q_ids_override: q_ids,  // 传递指定ID
+      }),
+    });
+
+    // 直接用 start_by_ids 拿到的题目构造重做数据
+    // 由于 start_by_ids 只返回第一题，改用另一个思路：
+    // 直接读取服务器题目详情
+    const detailRes = await fetch('/api/wrong_book/questions', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({q_ids}),
+    });
+    const questions = await detailRes.json();
+
+    if (!questions.length) { alert('题目数据获取失败'); return; }
+
+    // 补充 options 字段格式
+    const formatted = questions.map((q, i) => ({
+      ...q,
+      index: i,
+      total: questions.length,
+    }));
+
+    const retryData = {
+      questions:    formatted,
+      answers:      {},
+      totalSeconds: 3600,
+      startTime:    Date.now(),
+    };
+
+    sessionStorage.setItem('retry_exam_data', JSON.stringify(retryData));
+    window.location.href = '/exam?mode=retry';
+
+  } catch(e) {
+    alert('获取题目失败，请重试');
+  }
+}
+
+// ================================================================
 // 初始化
-// ============================================================
-loadRecords();
+// ================================================================
+init();
 </script>
 
 {% endblock %}

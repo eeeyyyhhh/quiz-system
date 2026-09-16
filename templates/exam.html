@@ -9,6 +9,28 @@
     共120题 · 单选40×1分 + 多选40×1分 + 判断40×0.5分 = 100分 · 限时60分钟
   </p>
 
+  <!-- 续考提示（默认隐藏，有未完成考试时显示） -->
+  <div id="resume-tip"
+       style="display:none;background:#fff8e1;border:1px solid #fcd34d;
+              border-radius:8px;padding:14px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:bold;color:#92400e;margin-bottom:6px;">
+      ⏸️ 发现未完成的考试
+    </div>
+    <div id="resume-info" style="font-size:12px;color:#78350f;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="resumeExam()"
+              style="flex:1;padding:8px;background:#f59e0b;color:#fff;
+                     border:none;border-radius:6px;cursor:pointer;font-size:13px;">
+        ▶️ 继续考试
+      </button>
+      <button onclick="abandonExam()"
+              style="flex:1;padding:8px;background:#e5e7eb;color:#555;
+                     border:none;border-radius:6px;cursor:pointer;font-size:13px;">
+        🗑️ 放弃本次
+      </button>
+    </div>
+  </div>
+
   <!-- 题型分布 -->
   <div style="background:#f8f9fa;border-radius:8px;padding:15px;margin-bottom:18px;">
     <div style="display:flex;justify-content:space-around;text-align:center;">
@@ -40,9 +62,9 @@
         <div style="font-size:14px;font-weight:bold;color:#1d4ed8;">
           🔄 不重复抽题
         </div>
-        <div style="font-size:12px;color:#6b7280;margin-top:3px;"
-             id="remain-tip">
-          已做 0 题，剩余 <span id="remain-count">-</span> 题可抽
+        <div id="remain-tip"
+             style="font-size:12px;color:#6b7280;margin-top:3px;">
+          加载中...
         </div>
       </div>
       <label style="position:relative;display:inline-block;
@@ -62,9 +84,10 @@
       </label>
     </div>
 
-    <div id="reset-tip" style="display:none;margin-top:10px;
-                                padding:8px;background:#fff3cd;
-                                border-radius:6px;font-size:12px;color:#856404;">
+    <div id="reset-tip"
+         style="display:none;margin-top:10px;padding:8px;
+                background:#fff3cd;border-radius:6px;
+                font-size:12px;color:#856404;">
       ⚠️ 剩余题目不足120题，是否重置已做记录重新开始？
       <div style="margin-top:6px;display:flex;gap:8px;">
         <button onclick="resetDoneList()"
@@ -72,8 +95,7 @@
                        border:none;border-radius:5px;cursor:pointer;font-size:12px;">
           重置并开始
         </button>
-        <button onclick="document.getElementById('no-repeat-toggle').checked=false;
-                         onToggleNoRepeat();"
+        <button onclick="closeNoRepeat()"
                 style="padding:4px 12px;background:#e5e7eb;color:#555;
                        border:none;border-radius:5px;cursor:pointer;font-size:12px;">
           关闭该功能
@@ -100,7 +122,8 @@
 </div>
 
 <!-- 加载中 -->
-<div id="loading-panel" style="display:none;text-align:center;padding:60px;">
+<div id="loading-panel"
+     style="display:none;text-align:center;padding:60px;">
   <div style="font-size:40px;margin-bottom:15px;">⏳</div>
   <p style="color:#888;">正在抽题，请稍候...</p>
 </div>
@@ -114,10 +137,12 @@
               display:flex;justify-content:space-between;align-items:center;
               box-shadow:0 2px 6px rgba(0,0,0,0.06);">
     <div style="font-size:13px;color:#666;">
-      已答 <span id="answered-count"
-                 style="font-weight:bold;color:#3b82f6;">0</span>/<span id="total-count">120</span>
+      已答
+      <span id="answered-count"
+            style="font-weight:bold;color:#3b82f6;">0</span>/<span id="total-count">120</span>
     </div>
-    <div id="timer-box" style="font-size:18px;font-weight:bold;color:#333;">
+    <div id="timer-box"
+         style="font-size:18px;font-weight:bold;color:#333;">
       ⏱ <span id="time-display">60:00</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
@@ -151,19 +176,26 @@
                        cursor:pointer;color:#888;">×</button>
       </div>
       <div style="font-size:11px;color:#888;margin-bottom:10px;display:flex;gap:10px;">
-        <span><span style="display:inline-block;width:12px;height:12px;
-                            background:#e0e0e0;border-radius:3px;vertical-align:middle;
-                            margin-right:3px;"></span>未答</span>
-        <span><span style="display:inline-block;width:12px;height:12px;
-                            background:#3b82f6;border-radius:3px;vertical-align:middle;
-                            margin-right:3px;"></span>已答</span>
+        <span>
+          <span style="display:inline-block;width:12px;height:12px;
+                       background:#e0e0e0;border-radius:3px;
+                       vertical-align:middle;margin-right:3px;"></span>未答
+        </span>
+        <span>
+          <span style="display:inline-block;width:12px;height:12px;
+                       background:#3b82f6;border-radius:3px;
+                       vertical-align:middle;margin-right:3px;"></span>已答
+        </span>
       </div>
       <div style="font-size:12px;color:#3b82f6;font-weight:bold;margin-bottom:4px;">单选题</div>
-      <div id="sheet-single" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;"></div>
+      <div id="sheet-single"
+           style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;"></div>
       <div style="font-size:12px;color:#f59e0b;font-weight:bold;margin-bottom:4px;">多选题</div>
-      <div id="sheet-multi"  style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;"></div>
+      <div id="sheet-multi"
+           style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;"></div>
       <div style="font-size:12px;color:#22c55e;font-weight:bold;margin-bottom:4px;">判断题</div>
-      <div id="sheet-judge"  style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;"></div>
+      <div id="sheet-judge"
+           style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;"></div>
       <button onclick="confirmSubmit()"
               style="width:100%;padding:10px;background:#e74c3c;color:#fff;
                      border:none;border-radius:8px;cursor:pointer;font-size:14px;">
@@ -178,31 +210,97 @@
 <!-- 成绩页面 -->
 <div id="result-panel" style="display:none;"></div>
 
-<!-- ============================================================ -->
+<!-- ================================================================ -->
 <script>
+// ================================================================
+// localStorage Key 常量
+// ================================================================
+const KEY_DONE_IDS      = 'exam_done_ids';       // 不重复抽题：已做题目ID集合
+const KEY_NO_REPEAT     = 'exam_no_repeat';       // 不重复开关状态
+const KEY_ONGOING       = 'exam_ongoing';         // 进行中的考试快照
+const KEY_RECORDS       = 'exam_records_local';   // 本地考试记录
+
+// ================================================================
+// 全局状态
+// ================================================================
 let examQuestions = [];
 let userAnswers   = {};
 let timerInterval = null;
-let totalSeconds  = 60 * 60;
+let totalSeconds  = 3600;
 let examStartTime = null;
 let sheetOpen     = false;
 let isRetryMode   = false;
+// 自动保存定时器
+let autoSaveTimer = null;
 
-// ============================================================
-// 不重复抽题 — localStorage 操作
-// ============================================================
-const DONE_KEY = 'exam_done_ids';   // 存已做过的题目ID集合
+// ================================================================
+// 页面初始化
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. 恢复开关状态
+  initToggle();
 
+  // 2. 更新剩余题目提示
+  updateRemainTip();
+
+  // 3. 检查是否重做模式（从考试记录页跳过来的）
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('mode') === 'retry') {
+    const data = sessionStorage.getItem('retry_exam_data');
+    if (data) {
+      sessionStorage.removeItem('retry_exam_data');
+      isRetryMode = true;
+      document.getElementById('setup-panel').style.display = 'none';
+      loadExamData(JSON.parse(data), false);
+      return;
+    }
+  }
+
+  // 4. 检查是否有未完成考试
+  checkOngoingExam();
+});
+
+// ================================================================
+// 开关持久化
+// ================================================================
+function initToggle() {
+  const saved   = localStorage.getItem(KEY_NO_REPEAT) === 'true';
+  const toggle  = document.getElementById('no-repeat-toggle');
+  const track   = document.getElementById('toggle-track');
+  const thumb   = document.getElementById('toggle-thumb');
+  toggle.checked             = saved;
+  track.style.background     = saved ? '#3b82f6' : '#ccc';
+  thumb.style.transform      = saved ? 'translateX(20px)' : 'translateX(0)';
+}
+
+function onToggleNoRepeat() {
+  const checked = document.getElementById('no-repeat-toggle').checked;
+  const track   = document.getElementById('toggle-track');
+  const thumb   = document.getElementById('toggle-thumb');
+  track.style.background = checked ? '#3b82f6' : '#ccc';
+  thumb.style.transform  = checked ? 'translateX(20px)' : 'translateX(0)';
+  // 持久化
+  localStorage.setItem(KEY_NO_REPEAT, checked ? 'true' : 'false');
+  document.getElementById('reset-tip').style.display = 'none';
+  updateRemainTip();
+}
+
+function closeNoRepeat() {
+  document.getElementById('no-repeat-toggle').checked = false;
+  onToggleNoRepeat();
+}
+
+// ================================================================
+// 不重复抽题 — 已做题目ID管理
+// ================================================================
 function getDoneIds() {
   try {
-    return new Set(JSON.parse(localStorage.getItem(DONE_KEY) || '[]'));
-  } catch(e) {
-    return new Set();
-  }
+    return new Set(JSON.parse(localStorage.getItem(KEY_DONE_IDS) || '[]'));
+  } catch(e) { return new Set(); }
 }
 
 function saveDoneIds(set) {
-  localStorage.setItem(DONE_KEY, JSON.stringify([...set]));
+  localStorage.setItem(KEY_DONE_IDS, JSON.stringify([...set]));
 }
 
 function addDoneIds(ids) {
@@ -212,7 +310,7 @@ function addDoneIds(ids) {
 }
 
 function resetDoneList() {
-  localStorage.removeItem(DONE_KEY);
+  localStorage.removeItem(KEY_DONE_IDS);
   document.getElementById('reset-tip').style.display = 'none';
   updateRemainTip();
   startExam();
@@ -220,37 +318,97 @@ function resetDoneList() {
 
 function updateRemainTip() {
   const noRepeat = document.getElementById('no-repeat-toggle').checked;
+  const tip      = document.getElementById('remain-tip');
   if (!noRepeat) {
-    document.getElementById('remain-tip').textContent = '关闭状态，每次从全库随机抽题';
+    tip.textContent = '关闭状态，每次从全库随机抽题';
     return;
   }
   const done   = getDoneIds();
-  const remain = Math.max(0, 1579 - done.size);   // 1579为总题数，可按实际调整
-  document.getElementById('remain-count').textContent = remain;
-  document.getElementById('remain-tip').innerHTML =
-    `已做 ${done.size} 题，剩余 <span id="remain-count">${remain}</span> 题可抽`;
+  const remain = Math.max(0, 1579 - done.size);
+  tip.innerHTML =
+    `已做 <b>${done.size}</b> 题，剩余 <b style="color:#1d4ed8">${remain}</b> 题可抽`;
 }
 
-function onToggleNoRepeat() {
-  const checked = document.getElementById('no-repeat-toggle').checked;
-  const track   = document.getElementById('toggle-track');
-  const thumb   = document.getElementById('toggle-thumb');
-  track.style.background      = checked ? '#3b82f6' : '#ccc';
-  thumb.style.transform       = checked ? 'translateX(20px)' : 'translateX(0)';
-  document.getElementById('reset-tip').style.display = 'none';
-  updateRemainTip();
+// ================================================================
+// 未完成考试 — 快照存取
+// ================================================================
+function saveOngoingExam() {
+  if (!examQuestions.length || isRetryMode) return;
+  const snapshot = {
+    questions:    examQuestions,
+    answers:      userAnswers,
+    totalSeconds: totalSeconds,
+    startTime:    examStartTime,
+    savedAt:      Date.now(),
+  };
+  localStorage.setItem(KEY_ONGOING, JSON.stringify(snapshot));
 }
 
-// 初始化时更新提示
-updateRemainTip();
+function clearOngoingExam() {
+  localStorage.removeItem(KEY_ONGOING);
+}
 
-// ============================================================
-// 答题卡
-// ============================================================
+function checkOngoingExam() {
+  const raw = localStorage.getItem(KEY_ONGOING);
+  if (!raw) return;
+  try {
+    const snap = JSON.parse(raw);
+    if (!snap.questions || !snap.questions.length) {
+      clearOngoingExam();
+      return;
+    }
+    // 计算距上次保存经过多少秒
+    const elapsed   = Math.floor((Date.now() - snap.savedAt) / 1000);
+    const remaining = Math.max(0, snap.totalSeconds - elapsed);
+
+    // 超时就清除
+    if (remaining <= 0) {
+      clearOngoingExam();
+      return;
+    }
+
+    const answered  = Object.values(snap.answers).filter(v => v && v.length).length;
+    const mins      = Math.floor(remaining / 60);
+    const secs      = remaining % 60;
+
+    document.getElementById('resume-info').innerHTML =
+      `已答 <b>${answered}</b>/${snap.questions.length} 题，
+       剩余时间 <b>${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}</b>`;
+    document.getElementById('resume-tip').style.display = 'block';
+  } catch(e) {
+    clearOngoingExam();
+  }
+}
+
+function resumeExam() {
+  const raw = localStorage.getItem(KEY_ONGOING);
+  if (!raw) return;
+  try {
+    const snap    = JSON.parse(raw);
+    const elapsed = Math.floor((Date.now() - snap.savedAt) / 1000);
+    snap.totalSeconds = Math.max(0, snap.totalSeconds - elapsed);
+
+    document.getElementById('setup-panel').style.display = 'none';
+    loadExamData(snap, true);   // true = 续考模式，恢复已有答案
+  } catch(e) {
+    clearOngoingExam();
+  }
+}
+
+function abandonExam() {
+  if (!confirm('确定放弃本次未完成的考试？')) return;
+  clearOngoingExam();
+  document.getElementById('resume-tip').style.display = 'none';
+}
+
+// ================================================================
+// 答题卡开关
+// ================================================================
 function toggleSheet() {
   sheetOpen = !sheetOpen;
   document.getElementById('sheet-drawer').style.display = sheetOpen ? 'block' : 'none';
 }
+
 function closeSheetOnMask(e) {
   if (e.target === document.getElementById('sheet-drawer')) {
     sheetOpen = false;
@@ -258,39 +416,11 @@ function closeSheetOnMask(e) {
   }
 }
 
-// ============================================================
-// 检查是否重做模式
-// ============================================================
-window.addEventListener('DOMContentLoaded', () => {
-  const url = new URL(window.location.href);
-  if (url.searchParams.get('mode') === 'retry') {
-    const data = sessionStorage.getItem('retry_exam_data');
-    if (data) {
-      sessionStorage.removeItem('retry_exam_data');
-      isRetryMode = true;
-      document.getElementById('setup-panel').style.display = 'none';
-      loadRetryExam(JSON.parse(data));
-    }
-  }
-});
-
-function loadRetryExam(data) {
-  examQuestions = data.questions;
-  totalSeconds  = data.duration;
-  examStartTime = Date.now();
-
-  document.getElementById('exam-panel').style.display = 'block';
-  document.getElementById('total-count').textContent  = examQuestions.length;
-  renderQuestions();
-  buildAnswerSheet();
-  startTimer();
-}
-
-// ============================================================
-// 开始考试
-// ============================================================
+// ================================================================
+// 开始新考试
+// ================================================================
 async function startExam() {
-  const noRepeat  = document.getElementById('no-repeat-toggle').checked;
+  const noRepeat   = document.getElementById('no-repeat-toggle').checked;
   const excludeIds = noRepeat ? [...getDoneIds()] : [];
 
   document.getElementById('setup-panel').style.display   = 'none';
@@ -308,14 +438,12 @@ async function startExam() {
     });
     const data = await res.json();
 
-    // 题目不足
     if (data.error === 'not_enough') {
       document.getElementById('setup-panel').style.display   = 'block';
       document.getElementById('loading-panel').style.display = 'none';
       document.getElementById('reset-tip').style.display     = 'block';
       return;
     }
-
     if (data.error) {
       alert('抽题失败：' + data.error);
       document.getElementById('setup-panel').style.display   = 'block';
@@ -323,17 +451,13 @@ async function startExam() {
       return;
     }
 
-    examQuestions = data.questions;
-    totalSeconds  = data.duration;
-    examStartTime = Date.now();
-
     document.getElementById('loading-panel').style.display = 'none';
-    document.getElementById('exam-panel').style.display    = 'block';
-    document.getElementById('total-count').textContent     = examQuestions.length;
-
-    renderQuestions();
-    buildAnswerSheet();
-    startTimer();
+    loadExamData({
+      questions:    data.questions,
+      answers:      {},
+      totalSeconds: data.duration,
+      startTime:    Date.now(),
+    }, false);
 
   } catch(e) {
     alert('网络错误，请重试');
@@ -342,9 +466,56 @@ async function startExam() {
   }
 }
 
-// ============================================================
+// ================================================================
+// 加载考试数据（新考试 / 续考 / 重做 通用入口）
+// ================================================================
+function loadExamData(snap, isResume) {
+  examQuestions = snap.questions;
+  userAnswers   = snap.answers   || {};
+  totalSeconds  = snap.totalSeconds || 3600;
+  examStartTime = snap.startTime || Date.now();
+
+  document.getElementById('exam-panel').style.display = 'block';
+  document.getElementById('total-count').textContent  = examQuestions.length;
+
+  renderQuestions();
+  buildAnswerSheet();
+  startTimer();
+
+  // 续考：恢复已有答案的高亮
+  if (isResume) {
+    Object.entries(userAnswers).forEach(([q_id, ans]) => {
+      if (!ans) return;
+      const q = examQuestions.find(q => q.q_id === q_id);
+      if (!q) return;
+      if (q.type === '多选题') {
+        const card = document.getElementById(`qcard-${q_id}`);
+        if (!card) return;
+        ans.split('').forEach(key => {
+          const inp = card.querySelector(`input[value="${key}"]`);
+          if (inp) inp.checked = true;
+        });
+        handleMultiChange(q_id);
+      } else {
+        const card = document.getElementById(`qcard-${q_id}`);
+        if (!card) return;
+        const inp = card.querySelector(`input[value="${ans}"]`);
+        if (inp) inp.checked = true;
+        handleSingleChange(q_id, ans);
+      }
+    });
+    updateAnsweredCount();
+  }
+
+  // 启动自动保存（每10秒保存一次，重做模式不保存）
+  if (!isRetryMode) {
+    autoSaveTimer = setInterval(saveOngoingExam, 10000);
+  }
+}
+
+// ================================================================
 // 渲染题目
-// ============================================================
+// ================================================================
 function renderQuestions() {
   const area = document.getElementById('questions-area');
   area.innerHTML = '';
@@ -362,7 +533,8 @@ function renderQuestions() {
     const title = document.createElement('div');
     title.style.cssText = `
       padding:10px 15px;margin:18px 0 8px;
-      background:${group.color}18;border-left:4px solid ${group.color};
+      background:${group.color}18;
+      border-left:4px solid ${group.color};
       font-weight:bold;color:${group.color};
       border-radius:0 6px 6px 0;font-size:14px;
     `;
@@ -410,8 +582,12 @@ function createQuestionCard(q, indexInGroup) {
 
     label.appendChild(input);
     label.appendChild(document.createTextNode(`${opt.key}. ${opt.text}`));
-    label.onmouseover = () => { if (!label.classList.contains('opted')) label.style.background = '#f5f7ff'; };
-    label.onmouseout  = () => { if (!label.classList.contains('opted')) label.style.background = ''; };
+    label.onmouseover = () => {
+      if (!label.classList.contains('opted')) label.style.background = '#f5f7ff';
+    };
+    label.onmouseout = () => {
+      if (!label.classList.contains('opted')) label.style.background = '';
+    };
     optWrap.appendChild(label);
   });
 
@@ -419,12 +595,13 @@ function createQuestionCard(q, indexInGroup) {
   return card;
 }
 
-// ============================================================
+// ================================================================
 // 答题处理
-// ============================================================
+// ================================================================
 function handleSingleChange(q_id, key) {
   userAnswers[q_id] = key;
   const card = document.getElementById(`qcard-${q_id}`);
+  if (!card) return;
   card.querySelectorAll('label').forEach(lb => {
     lb.classList.remove('opted');
     lb.style.background  = '';
@@ -445,7 +622,8 @@ function handleSingleChange(q_id, key) {
 }
 
 function handleMultiChange(q_id) {
-  const card    = document.getElementById(`qcard-${q_id}`);
+  const card = document.getElementById(`qcard-${q_id}`);
+  if (!card) return;
   const checked = Array.from(
     card.querySelectorAll(`input[name="ans_${q_id}"]:checked`)
   ).map(i => i.value).sort();
@@ -469,10 +647,13 @@ function handleMultiChange(q_id) {
   updateAnsweredCount();
 }
 
-// ============================================================
+// ================================================================
 // 答题卡
-// ============================================================
+// ================================================================
 function buildAnswerSheet() {
+  document.getElementById('sheet-single').innerHTML = '';
+  document.getElementById('sheet-multi').innerHTML  = '';
+  document.getElementById('sheet-judge').innerHTML  = '';
   buildSheetGroup('sheet-single', examQuestions.filter(q => q.type === '单选题'), '#3b82f6');
   buildSheetGroup('sheet-multi',  examQuestions.filter(q => q.type === '多选题'), '#f59e0b');
   buildSheetGroup('sheet-judge',  examQuestions.filter(q => q.type === '判断题'), '#22c55e');
@@ -513,35 +694,42 @@ function updateAnsweredCount() {
   document.getElementById('answered-count').textContent = count;
 }
 
-// ============================================================
+// ================================================================
 // 倒计时
-// ============================================================
+// ================================================================
 function startTimer() {
   const display = document.getElementById('time-display');
-  const m0 = Math.floor(totalSeconds / 60);
-  const s0 = totalSeconds % 60;
-  display.textContent = `${String(m0).padStart(2,'0')}:${String(s0).padStart(2,'0')}`;
 
-  timerInterval = setInterval(() => {
-    totalSeconds--;
-    if (totalSeconds <= 0) {
-      clearInterval(timerInterval);
-      alert('⏰ 时间到！自动提交试卷');
-      submitExam();
-      return;
-    }
+  function tick() {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
     display.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     if (totalSeconds <= 300) {
       document.getElementById('timer-box').style.color = '#e74c3c';
     }
+  }
+  tick();
+
+  timerInterval = setInterval(() => {
+    totalSeconds--;
+    if (totalSeconds <= 0) {
+      clearInterval(timerInterval);
+      clearInterval(autoSaveTimer);
+      alert('⏰ 时间到！自动提交试卷');
+      submitExam();
+      return;
+    }
+    tick();
+    // 每30秒也做一次快照（补充自动保存频率）
+    if (totalSeconds % 30 === 0 && !isRetryMode) {
+      saveOngoingExam();
+    }
   }, 1000);
 }
 
-// ============================================================
+// ================================================================
 // 提交
-// ============================================================
+// ================================================================
 function confirmSubmit() {
   const total      = examQuestions.length;
   const answered   = Object.values(userAnswers).filter(v => v && v.length > 0).length;
@@ -554,6 +742,8 @@ function confirmSubmit() {
 
 async function submitExam() {
   clearInterval(timerInterval);
+  clearInterval(autoSaveTimer);
+
   document.getElementById('exam-panel').style.display   = 'none';
   document.getElementById('result-panel').style.display = 'block';
   document.getElementById('result-panel').innerHTML = `
@@ -572,28 +762,26 @@ async function submitExam() {
     });
     const data = await res.json();
 
-    // 不重复模式：把本次题目ID加入已做列表
+    // 提交成功后清除进行中快照
+    clearOngoingExam();
+
+    // 正式考试才记录已做题目ID（重做模式不记录）
     if (!isRetryMode) {
-      const noRepeat = document.getElementById('no-repeat-toggle') &&
-                       document.getElementById('no-repeat-toggle').checked;
-      // 不管开关状态，都记录（开关只影响下次抽题是否排除）
-      // 实际排除逻辑在startExam里判断
-    }
-    // 将本次所有题目ID记录到localStorage
-    const thisIds = examQuestions.map(q => q.q_id);
-    if (!isRetryMode) {
-      // 只有正式考试才记录，重做错题不计入
-      addDoneIds(thisIds);
-      updateRemainTip();
+      addDoneIds(examQuestions.map(q => q.q_id));
     }
 
-    // 同步本地存储错题本
-    data.details.forEach(d => {
-      if (typeof LocalDB !== 'undefined') {
+    // 同步本地错题本
+    if (typeof LocalDB !== 'undefined') {
+      data.details.forEach(d => {
         LocalDB.recordAnswer(d.q_id, d.subject || '', d.type, d.user_answer, d.is_correct);
         LocalDB.updateWrongBook(d.q_id, d.subject || '', d.user_answer, d.is_correct);
-      }
-    });
+      });
+    }
+
+    // 保存考试记录到本地 localStorage（设备独立）
+    if (!isRetryMode) {
+      saveLocalExamRecord(data, usedSeconds);
+    }
 
     renderResult(data);
 
@@ -605,15 +793,41 @@ async function submitExam() {
   }
 }
 
-// ============================================================
+// ================================================================
+// 本地考试记录存取
+// ================================================================
+function getLocalRecords() {
+  try {
+    return JSON.parse(localStorage.getItem(KEY_RECORDS) || '[]');
+  } catch(e) { return []; }
+}
+
+function saveLocalExamRecord(data, usedSeconds) {
+  const records = getLocalRecords();
+  const record  = {
+    id:         Date.now(),   // 用时间戳作为ID
+    subject:    '综合',
+    total:      data.total,
+    correct:    data.correct,
+    score:      data.score,
+    duration:   usedSeconds,
+    details:    data.details,
+    created_at: new Date().toLocaleString('zh-CN', {hour12: false}),
+  };
+  records.unshift(record);   // 最新的放最前面
+  // 只保留最近15条
+  if (records.length > 15) records.splice(15);
+  localStorage.setItem(KEY_RECORDS, JSON.stringify(records));
+}
+
+// ================================================================
 // 成绩页
-// ============================================================
+// ================================================================
 function renderResult(data) {
   const mins    = Math.floor(data.duration / 60);
   const secs    = data.duration % 60;
   const timeStr = `${mins}分${secs}秒`;
 
-  // 各题型统计（含得分）
   const scoreMap  = {'单选题': 1, '多选题': 1, '判断题': 0.5};
   const typeStats = {};
   data.details.forEach(d => {
@@ -640,19 +854,15 @@ function renderResult(data) {
     typeHtml  += `
       <div style="flex:1;text-align:center;padding:12px;
                   background:#f8f9fa;border-radius:8px;">
-        <div style="font-size:20px;font-weight:bold;color:${c};">
-          ${s.score}
-        </div>
+        <div style="font-size:20px;font-weight:bold;color:${c};">${s.score}</div>
         <div style="font-size:11px;color:#aaa;">/${maxS}分</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">${t}</div>
-        <div style="font-size:11px;color:${c};">
-          ${s.correct}/${s.total} · ${rate}%
-        </div>
+        <div style="font-size:11px;color:${c};">${s.correct}/${s.total} · ${rate}%</div>
       </div>`;
   });
 
-  const wrongs   = data.details.filter(d => !d.is_correct);
-  let wrongHtml  = '';
+  const wrongs  = data.details.filter(d => !d.is_correct);
+  let wrongHtml = '';
   wrongs.forEach((d, i) => {
     let optHtml = '';
     (d.options || []).forEach(opt => {
@@ -663,8 +873,7 @@ function renderResult(data) {
       else if (isSelected) bg = 'background:#ffeaea;color:#e74c3c;';
       optHtml += `
         <div style="padding:5px 10px;margin:3px 0;border-radius:4px;font-size:13px;${bg}">
-          ${opt.key}. ${opt.text}
-          ${isCorrect ? '✅' : isSelected ? '❌' : ''}
+          ${opt.key}. ${opt.text} ${isCorrect ? '✅' : isSelected ? '❌' : ''}
         </div>`;
     });
     const expHtml = d.explanation ? `
@@ -678,9 +887,7 @@ function renderResult(data) {
                   padding:15px;margin:10px 0;border-left:4px solid #e74c3c;">
         <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
           <span style="font-size:12px;color:#888;">${d.type} · 错题${i+1}</span>
-          <span style="font-size:12px;color:#e74c3c;">
-            扣${scoreMap[d.type] || 1}分
-          </span>
+          <span style="font-size:12px;color:#e74c3c;">扣${scoreMap[d.type] || 1}分</span>
         </div>
         <p style="font-size:14px;color:#333;margin-bottom:10px;">${d.stem}</p>
         ${optHtml}
@@ -695,8 +902,9 @@ function renderResult(data) {
 
   document.getElementById('result-panel').innerHTML = `
     <div style="text-align:center;padding:30px 20px 16px;">
-      <div style="font-size:64px;font-weight:bold;color:${scoreColor};
-                  line-height:1;">${data.score}</div>
+      <div style="font-size:64px;font-weight:bold;color:${scoreColor};line-height:1;">
+        ${data.score}
+      </div>
       <div style="font-size:18px;color:#555;margin:8px 0;">${scoreTip}</div>
       <div style="font-size:13px;color:#aaa;">
         答对 ${data.correct}/${data.total} 题 · 用时 ${timeStr}
@@ -705,20 +913,20 @@ function renderResult(data) {
 
     <div style="display:flex;gap:10px;padding:0 15px 16px;">${typeHtml}</div>
 
-    <div style="display:flex;gap:10px;padding:0 15px 20px;">
+    <div style="display:flex;gap:10px;padding:0 15px 20px;flex-wrap:wrap;">
       <button onclick="location.href='/exam'"
-              style="flex:1;padding:12px;background:#3b82f6;color:#fff;
-                     border:none;border-radius:8px;cursor:pointer;font-size:15px;">
+              style="flex:1;min-width:100px;padding:12px;background:#3b82f6;color:#fff;
+                     border:none;border-radius:8px;cursor:pointer;font-size:14px;">
         🔄 再考一次
       </button>
       <button onclick="location.href='/exam_records'"
-              style="flex:1;padding:12px;background:#22c55e;color:#fff;
-                     border:none;border-radius:8px;cursor:pointer;font-size:15px;">
+              style="flex:1;min-width:100px;padding:12px;background:#22c55e;color:#fff;
+                     border:none;border-radius:8px;cursor:pointer;font-size:14px;">
         📊 考试记录
       </button>
       <button onclick="location.href='/wrong_book'"
-              style="flex:1;padding:12px;background:#f59e0b;color:#fff;
-                     border:none;border-radius:8px;cursor:pointer;font-size:15px;">
+              style="flex:1;min-width:100px;padding:12px;background:#f59e0b;color:#fff;
+                     border:none;border-radius:8px;cursor:pointer;font-size:14px;">
         📕 错题本
       </button>
     </div>
