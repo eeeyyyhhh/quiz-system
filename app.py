@@ -15,7 +15,6 @@ from modules.ai_helper import generate_explanation
 app = Flask(__name__)
 app.secret_key = 'study_system_2024_secret'
 
-# 服务器内存存题目列表，不塞进session
 _practice_store = {}
 
 # ============================================================
@@ -42,7 +41,6 @@ def _get_subjects_cached():
 # 工具函数
 # ============================================================
 def get_q_by_id(q_id: str):
-    """通过 ID 查找题目"""
     try:
         subject, seq = q_id.split('_', 1)
         for q in ALL_QUESTIONS.get(subject, []):
@@ -55,7 +53,6 @@ def get_q_by_id(q_id: str):
 
 def _build_question_list(subject=None, q_type=None, mode='order',
                          range_start=1, range_end=None):
-    """构建题目列表（不含个人数据过滤，过滤由前端完成）"""
     questions = []
     subjects  = [subject] if subject else list(SUBJECTS.keys())
     for sub in subjects:
@@ -75,19 +72,17 @@ def _build_question_list(subject=None, q_type=None, mode='order',
 
 
 def _format_question(q: dict, index: int, total: int) -> dict:
-    """格式化单道题目，返回给前端"""
     q    = dict(q)
     q_id = get_question_id(q['subject'], q['seq'])
     q['q_id']        = q_id
     q['index']       = index
     q['total']       = total
-    q['is_favorite'] = False        # 收藏由前端 localStorage 判断
+    q['is_favorite'] = False
     q['note']        = db.get_note(q_id)
     exp              = db.get_explanation(q_id)
     q['explanation'] = exp.get('content', '')
     q['exp_source']  = exp.get('source', '')
 
-    # 构建选项列表
     options = []
     for key in ['A', 'B', 'C', 'D', 'E', 'F']:
         val = q.get(f'option_{key.lower()}', '')
@@ -95,7 +90,6 @@ def _format_question(q: dict, index: int, total: int) -> dict:
             options.append({'key': key, 'text': val})
     q['options'] = options
 
-    # 判断题统一选项
     if q['type'] == '判断题':
         q['options'] = [
             {'key': 'A', 'text': '正确'},
@@ -116,7 +110,7 @@ def index():
     )
 
 # ============================================================
-# 科目题目总数接口（首页进度条用）
+# 科目题目总数接口
 # ============================================================
 @app.route('/api/stats/<subject>')
 def api_stats_subject(subject):
@@ -124,7 +118,7 @@ def api_stats_subject(subject):
     return jsonify({'total': total, 'answered': 0, 'correct_rate': 0})
 
 # ============================================================
-# 题目ID列表接口（供前端过滤用）
+# 题目ID列表接口
 # ============================================================
 @app.route('/api/local/question_ids')
 def api_local_question_ids():
@@ -146,6 +140,20 @@ def api_local_question_ids():
     return jsonify(result)
 
 # ============================================================
+# 全部题目ID接口（给不重复抽题用）
+# ============================================================
+@app.route('/api/exam/all_ids')
+def api_exam_all_ids():
+    """返回全库所有题目ID，按题型分组"""
+    result = {'单选题': [], '多选题': [], '判断题': []}
+    for sub in ALL_QUESTIONS:
+        for q in ALL_QUESTIONS[sub]:
+            q_id = get_question_id(q['subject'], q['seq'])
+            if q['type'] in result:
+                result[q['type']].append(q_id)
+    return jsonify(result)
+
+# ============================================================
 # 练习页面
 # ============================================================
 @app.route('/practice')
@@ -157,7 +165,6 @@ def practice_page():
 
 @app.route('/api/practice/start', methods=['POST'])
 def practice_start():
-    """顺序/随机开始练习（不含个人过滤，兼容旧调用）"""
     data        = request.json
     subject     = data.get('subject') or None
     q_type      = data.get('q_type') or None
@@ -186,7 +193,6 @@ def practice_start():
 
 @app.route('/api/practice/start_by_ids', methods=['POST'])
 def practice_start_by_ids():
-    """前端传入已过滤好的题目ID列表（localStorage 模式）"""
     data  = request.json
     q_ids = data.get('q_ids', [])
 
@@ -228,7 +234,6 @@ def practice_question(index):
 
 @app.route('/api/practice/answer', methods=['POST'])
 def practice_answer():
-    """判断答题是否正确，返回正确答案和解析（不写库，由前端本地记录）"""
     data        = request.json
     q_id        = data.get('q_id')
     user_answer = data.get('answer', '').upper().strip()
@@ -244,7 +249,6 @@ def practice_answer():
     else:
         is_correct = user_answer == correct_answer
 
-    # 判断题转换显示
     display_answer = correct_answer
     if q['type'] == '判断题':
         display_answer = '正确' if correct_answer == 'A' else '错误'
@@ -269,7 +273,6 @@ def wrong_book_page():
 
 @app.route('/api/wrong_book/questions', methods=['POST'])
 def api_wrong_book_questions():
-    """前端传入错题 ID 列表，返回题目详情（不含个人记录）"""
     data    = request.json
     q_ids   = data.get('q_ids', [])
     subject = data.get('subject', '')
@@ -310,11 +313,10 @@ def api_wrong_book_questions():
 
 @app.route('/api/wrong_book/remove/<q_id>', methods=['POST'])
 def api_remove_wrong(q_id):
-    """错题移除由前端本地完成，此接口保留兼容"""
     return jsonify({'success': True})
 
 # ============================================================
-# 考试模式（固定：单选40 + 多选40 + 判断40，共120题，60分钟）
+# 考试模式
 # ============================================================
 @app.route('/exam')
 def exam_page():
@@ -332,10 +334,31 @@ def exam_start():
         '多选题': 40,
         '判断题': 40,
     })
+    # 前端传入要排除的题目ID（不重复模式）
+    exclude_ids = set(data.get('exclude_ids', []))
 
-    all_qs   = _build_question_list(subject=subject, mode='random')
+    all_qs = _build_question_list(subject=subject, mode='random')
     if not all_qs:
         return jsonify({'error': '题库为空'}), 400
+
+    # 过滤已做过的题目
+    if exclude_ids:
+        filtered = [q for q in all_qs
+                    if get_question_id(q['subject'], q['seq']) not in exclude_ids]
+        # 检查剩余题目是否足够
+        type_count = {}
+        for q in filtered:
+            type_count[q['type']] = type_count.get(q['type'], 0) + 1
+        total_needed = sum(ratio.values())
+        total_remain = sum(type_count.values())
+
+        if total_remain < total_needed:
+            return jsonify({
+                'error': 'not_enough',
+                'remain': total_remain,
+                'needed': total_needed,
+            }), 400
+        all_qs = filtered
 
     type_map = {}
     for q in all_qs:
@@ -376,6 +399,7 @@ def exam_start():
         'total':     total_count,
         'duration':  duration * 60,
         'questions': formatted,
+        'exam_ids':  exam_ids,   # 返回本次题目ID，前端存入已做列表
     }
     if shortage:
         resp['warning'] = '；'.join(shortage)
@@ -394,9 +418,13 @@ def exam_submit():
     if not ids:
         return jsonify({'error': '考试会话已过期，请重新开始考试'}), 400
 
-    total   = len(ids)
-    correct = 0
-    details = []
+    total        = len(ids)
+    score        = 0.0
+    correct_count = 0
+    details      = []
+
+    # 分值配置
+    score_map = {'单选题': 1.0, '多选题': 1.0, '判断题': 0.5}
 
     for q_id in ids:
         q = get_q_by_id(q_id)
@@ -412,7 +440,8 @@ def exam_submit():
             is_correct = user_answer == correct_answer
 
         if is_correct:
-            correct += 1
+            correct_count += 1
+            score += score_map.get(q['type'], 1.0)
 
         options = []
         for key in ['A', 'B', 'C', 'D', 'E', 'F']:
@@ -444,27 +473,119 @@ def exam_submit():
             'correct_answer': display_correct,
             'user_answer':    display_user,
             'is_correct':     is_correct,
+            'score':          score_map.get(q['type'], 1.0),
             'explanation':    exp.get('content', ''),
         })
 
-    score         = round(correct / total * 100, 1) if total else 0
+    score         = round(score, 1)
     subject_label = session.get('exam_subject', '综合')
 
     db.save_exam_record(
-        subject_label, total, correct, score, duration,
+        subject_label, total, correct_count, score, duration,
         json.dumps(details, ensure_ascii=False)
     )
 
+    # 返回本次考试ID，供前端存入历史记录
+    exam_record_id = db.get_last_exam_id()
+
     return jsonify({
-        'total':    total,
-        'correct':  correct,
-        'score':    score,
-        'duration': duration,
-        'details':  details,
+        'total':         total,
+        'correct':       correct_count,
+        'score':         score,
+        'duration':      duration,
+        'details':       details,
+        'exam_record_id': exam_record_id,
+    })
+
+
+# ============================================================
+# 考试记录页面
+# ============================================================
+@app.route('/exam_records')
+def exam_records_page():
+    return render_template('exam_records.html')
+
+
+@app.route('/api/exam/records')
+def api_exam_records():
+    """获取最近15次考试记录"""
+    records = db.get_exam_records(15)
+    result  = []
+    for r in records:
+        item = {
+            'id':         r['id'],
+            'subject':    r['subject'],
+            'total':      r['total'],
+            'correct':    r['correct'],
+            'score':      r['score'],
+            'duration':   r['duration'],
+            'created_at': r['created_at'],
+        }
+        result.append(item)
+    return jsonify(result)
+
+
+@app.route('/api/exam/record/<int:record_id>')
+def api_exam_record_detail(record_id):
+    """获取单次考试详情（含错题，用于重做）"""
+    record = db.get_exam_record_by_id(record_id)
+    if not record:
+        return jsonify({'error': '记录不存在'}), 404
+    detail = json.loads(record['detail']) if record['detail'] else []
+    return jsonify({
+        'id':         record['id'],
+        'subject':    record['subject'],
+        'total':      record['total'],
+        'correct':    record['correct'],
+        'score':      record['score'],
+        'duration':   record['duration'],
+        'created_at': record['created_at'],
+        'details':    detail,
+    })
+
+
+@app.route('/api/exam/record/<int:record_id>/retry', methods=['POST'])
+def api_exam_record_retry(record_id):
+    """重做某次考试的错题"""
+    record = db.get_exam_record_by_id(record_id)
+    if not record:
+        return jsonify({'error': '记录不存在'}), 404
+
+    details    = json.loads(record['detail']) if record['detail'] else []
+    wrong_ids  = [d['q_id'] for d in details if not d['is_correct']]
+
+    if not wrong_ids:
+        return jsonify({'error': '本次考试没有错题'}), 400
+
+    questions = [get_q_by_id(qid) for qid in wrong_ids]
+    questions = [q for q in questions if q]
+
+    if not questions:
+        return jsonify({'error': '题目数据不存在'}), 400
+
+    total_count  = len(questions)
+    practice_key = str(uuid.uuid4())
+    ids          = [get_question_id(q['subject'], q['seq']) for q in questions]
+    _practice_store[practice_key]  = ids
+    session['exam_key']            = practice_key
+    session['exam_duration']       = 3600
+    session['exam_subject']        = record['subject'] or '综合'
+
+    formatted = [_format_question(q, i, total_count)
+                 for i, q in enumerate(questions)]
+    for q in formatted:
+        q.pop('answer', None)
+
+    return jsonify({
+        'total':     total_count,
+        'duration':  3600,
+        'questions': formatted,
+        'exam_ids':  ids,
+        'is_retry':  True,
     })
 
 # ============================================================
-# 收藏（已改为前端本地存储，接口保留兼容）
+# 收藏
 # ============================================================
 @app.route('/api/favorite', methods=['POST'])
 def api_favorite():
@@ -482,7 +603,7 @@ def api_note():
     return jsonify({'ok': True})
 
 # ============================================================
-# 解析（手动 / AI）
+# 解析
 # ============================================================
 @app.route('/api/explanation', methods=['POST'])
 def api_explanation():
@@ -510,8 +631,8 @@ def api_ai_explanation():
 # ============================================================
 @app.route('/stats')
 def stats_page():
-    subjects       = list(SUBJECTS.keys())
-    subject_totals = {sub: len(ALL_QUESTIONS.get(sub, [])) for sub in subjects}
+    subjects        = list(SUBJECTS.keys())
+    subject_totals  = {sub: len(ALL_QUESTIONS.get(sub, [])) for sub in subjects}
     total_questions = sum(subject_totals.values())
     exam_records    = db.get_exam_records(10)
     return render_template('stats.html',
@@ -557,7 +678,7 @@ def plan_save():
     return redirect('/plan')
 
 # ============================================================
-# 今日复习（复习题目由前端本地决定）
+# 今日复习
 # ============================================================
 @app.route('/review')
 def review_page():
@@ -569,7 +690,7 @@ def api_today_review():
     return jsonify({'total': 0, 'questions': []})
 
 # ============================================================
-# ✅ PWA - Service Worker 必须从根路径提供
+# PWA - Service Worker
 # ============================================================
 @app.route('/sw.js')
 def service_worker():
